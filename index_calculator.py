@@ -425,7 +425,7 @@ class IndexCalculator:
             self.__frm = self.schedule.real.iat[0]
             self.__to = self.schedule.end.iat[-1]
 
-        self.__times = None
+        self.clear()
 
     use = __init__
 
@@ -464,7 +464,7 @@ class IndexCalculator:
 
     @frequency.setter
     def frequency(self, frequency):
-        self.__times = None
+        self.clear()
         self._freq = pd.Timedelta(frequency)
         if not "_change" in self.schedule:
             # _change is left in there if the start column has never been calculated
@@ -539,7 +539,7 @@ class IndexCalculator:
         original_freq = self._freq
         original_start = self.schedule.start
         original_times = self.__times
-        self.__times = None
+        self.clear()
         self.frequency = frequency  # will adjust starts
         yield
         self.schedule["start"] = original_start  # reset to prior
@@ -774,6 +774,7 @@ class IndexCalculator:
             new = pd.concat(parts).sort_values(self._srt)
             tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
             new = new.set_index(tx, drop=True).drop(columns=self._srt)
+
         elif even:
             new = data.resample(self.frequency, label=label, origin=self._sched.start.iat[0]
                                 ).agg(agg_map).dropna(how="any")

@@ -4,6 +4,18 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 
+"""
+What does each instance need?
+
+    An order of market_times
+    
+    Session end market_times
+    
+
+
+"""
+
+
 
 class IndexCalculator:
     """
@@ -295,9 +307,7 @@ class IndexCalculator:
     default_agg_map = {"open": "first", "high": "max", "low": "min",
                        "close": "last", "volume": "sum"}
 
-    _accepted_columns = ["pre", "market_open", "break_start",
-                         "break_end", "market_close", "post"]
-
+    _valid_start_end = (True, False, "cross")
     _tdzero = pd.Timedelta(0)
     _day = pd.Timedelta("1D")
     _some_date = pd.Timestamp(0)  # epoch
@@ -307,120 +317,76 @@ class IndexCalculator:
     @classmethod
     def _verify_schedule(cls, schedule):
         if any(schedule[col].dt.tz is None for col in schedule):
-            raise TimeZoneException("Make sure all columns are tz aware")
-
-        elif not schedule.columns.isin(cls._accepted_columns).all():
-            raise InvalidColumns(f"Please ensure that all columns are in {cls._accepted_columns}"
-                                 f"\n[ISSUE]-> {schedule.columns[~schedule.columns.isin(cls._accepted_columns)]}")
-
-        elif schedule.columns.isin(["market_open", "market_close"]).sum() != 2:
-            raise InvalidColumns(f"market_open and market_close must always be in a schedule")
-
-        elif schedule.columns.isin(["pre", "post"]).sum() == 1:
-            raise InvalidColumns(f"Either both or none of pre and post can be in a schedule")
+            raise TimeZoneException("Make sure all columns are tz aware,"
+                                    " IndexCalculator.set_schedule_tz(schedule, to_tz, from_tz)"
+                                    " makes this really easy")
 
         elif schedule.columns.isin(["break_start", "break_end"]).sum() == 1:
             raise InvalidColumns(f"Either both or none of break_start and break_end can be in a schedule")
 
-        cols = sorted(schedule.columns, key=lambda x: cls._accepted_columns.index(x))
-        for col1, col2 in zip(cols[1:], cols[:-1]):
+        for col1, col2 in zip(schedule.columns[1:], schedule.columns[:-1]):
             if schedule[col1].lt(schedule[col2]).any():
-                raise InvalidInput("Some values seem to be messed up, please correct the schedule")
+                raise InvalidInput("The columns must be in the order in which every column is "
+                                   "greater or equal to the preceding one.")
+
 
     @classmethod
-    def set_schedule_tz(cls, schedule, to_tz):
+    def set_schedule_tz(cls, schedule, to_tz, from_tz= None):
         schedule = schedule.copy()
         for col in schedule:
             try:
                 schedule[col] = schedule[col].dt.tz_convert(to_tz)
             except TypeError as e:
-                raise TimeZoneException("All columns must be tz-aware") from e
-
+                if from_tz is None:
+                    raise TimeZoneException("If columns are not tz-aware, you need to pass from_tz") from e
+                schedule[col] = schedule[col].dt.tz_localize(from_tz).dt.tz_convert(to_tz)
         return schedule
 
     @staticmethod
     def tDelta(t):
         return pd.Timedelta(hours=t.hour, minutes=t.minute, seconds=t.second)
 
-    @classmethod
-    def _add_column(cls, schedule, **kwarg):
-        """will change the schedule in place and return it"""
-        if len(kwarg) > 1: raise InvalidInput("Only parse one col at a time")
-        col = list(kwarg.keys())[0]
-        schedule[col] = schedule.index.tz_localize(None)  # create dates to manipulate
-        _dates = schedule[col]  # keep reference to dates (*Series* with an index)
-
-        if isinstance(kwarg[col], dt.time):
-            schedule[col] += cls.tDelta(kwarg[col])
-
-        elif isinstance(kwarg[col], dict):
-            # make sure its sorted and None is the last value
-            borders = list(kwarg[col].keys())
-            try:
-                borders.remove(None)
-            except ValueError:
-                raise InvalidInput("A dictionary of times always needs one entry with `None` as key.")
-            borders = sorted(borders, key=lambda x: pd.Timestamp(x)) + [None]
-
-            earliest = _dates.min()  # will be set to `d` after each iteration
-            for d in borders:
-                t = cls.tDelta(kwarg[col][d])
-                if d is None:  # the current time
-                    # earliest = d = the first date with new time, greater or equal to d
-                    schedule.loc[_dates >= earliest, col] = _dates + t
-                else:
-                    # less than d
-                    schedule.loc[(_dates >= earliest) & (_dates < d), col] = _dates + t
-
-                earliest = d
-        else:
-            raise InvalidInput("values for the column need to be a dt.time object or a dictionary")
-
-        return schedule
-
-    def __init__(self, schedule=None, frequency=None, start=True, end=False,
-                 pre=False, brk=False, rth=False, post=False):
+    def __init__(self, schedule=None, frequency=None, start=True, end=False, **kwargs):
         """
         :param schedule:
         :param frequency:
         :param start:
         :param end:
-        :param pre:
+        :param market_open:
         :param brk:
         :param rth:
         :param post:
         """
-
-        _valid = (True, False, "cross")
-        if not (start in _valid and end in _valid):
-            raise InvalidConfiguration("start and end can only be True, False or 'cross'")
-
-        if not all([x in ("start", "end", False) for x in [pre, brk, rth, post]]):
-            raise InvalidConfiguration("pre, rth, and post can only be 'start', 'end' or False")
-
         self._freq = None if frequency is None else pd.Timedelta(frequency)
         self.has_breaks = False if schedule is None else ("break_start" in schedule
                                                           and "break_end" in schedule)
+
+        if not (start in self._valid_start_end and end in self._valid_start_end):
+            raise InvalidConfiguration("start and end can only be True, False or 'cross'")
+
+        _vals = kwargs.values()
+        if not all([x in ("start", "end", False) for x in kwargs.values()]):
+            raise InvalidConfiguration("market_times borders must be 'start', 'end' or False")
+
+
+
         self.start = start
         self.end = end
 
-        self.pre = pre
-        self.brk = brk or rth if self.has_breaks else False
-        self.rth = rth
-        self.post = post
-
-        self._aligns = (self.pre, self.brk, self.rth, self.post)
-        self._adj = self.start is not False or self.end != "cross" or any((x == "end" for x in self._aligns))
-        self.align = any(self._aligns)
+        self._aligns = kwargs
+        self._adj = (self.start is not False or self.end != "cross" or any((x == "end" for x in _vals)))
+        self._align = any(_vals)
 
         if schedule is None:
             self.schedtz = self.SCHEDTZ
             self.schedule = pd.DataFrame(columns=["real", "start", "end", "session"])
-            self.__frm = self._some_date
-            self.__to = self._some_date
+            self.__frm = self.__to =  self._some_date
         else:
-            self.schedtz = schedule.iloc[:, 0].dt.tz
             self._verify_schedule(schedule)
+            if schedule.columns[0] in kwargs or "break_end" in kwargs:
+                raise InvalidConfiguration("Sessions start cannot be borders")
+
+            self.schedtz = schedule.iloc[:, 0].dt.tz
             self.schedule = self._create_sessions_and_parts(schedule)
             self.__frm = self.schedule.real.iat[0]
             self.__to = self.schedule.end.iat[-1]
@@ -430,15 +396,13 @@ class IndexCalculator:
     use = __init__
 
     @contextmanager
-    def use_now(self, schedule, frequency, start=True, end=False,
-                pre=False, brk=False, rth=False, post=False):
+    def use_now(self, schedule, frequency, start=True, end=False, **kwargs):
         original_settings = self.settings
         original_schedule = self.schedule.copy()  # keeping it seperate from settings to avoid recalculation
         original_tz = self.schedtz
         frm = self.__frm
         to = self.__to
-        self.use(schedule=schedule, frequency=frequency, start=start,
-                 end=end, pre=pre, brk=brk, rth=rth, post=post)
+        self.use(schedule=schedule, frequency=frequency, start=start, end=end, **kwargs)
         yield
         self.use(schedule=None, **original_settings)  # passing None and setting it directly,
         self.schedule = original_schedule  # bypasses the calculation
@@ -475,8 +439,7 @@ class IndexCalculator:
 
     @property
     def settings(self):
-        return dict(frequency=self._freq, start=self.start, end=self.end,
-                    pre=self.pre, brk=self.brk, rth=self.rth, post=self.post)
+        return dict(frequency=self._freq, start=self.start, end=self.end, **self._aligns)
 
     def _create_sessions_and_parts(self, schedule):
         """
@@ -504,15 +467,14 @@ class IndexCalculator:
         :return:
         """
 
-        earliest = "pre" if "pre" in schedule else "market_open"
-        latest = "post" if "post" in schedule else "market_close"
-
+        earliest, latest = schedule.columns[[0, -1]]
         parts = []
-        for option, end_col in zip(self._aligns, ["market_open", "break_start", "market_close", "post"]):
-            if option or (self.has_breaks and end_col == "break_start"):
-                parts.append(schedule[[earliest, end_col]].copy())
+        for border in schedule.columns:
+            option = self._aligns.get(border, False)
+            if option or border == "break_start":
+                parts.append(schedule[[earliest, border]].copy())
                 parts[-1]["_change"] = option == "start"
-                earliest = end_col.replace("start", "end")  # in case of breaks
+                earliest = border.replace("break_start", "break_end")  # in case of breaks
 
         if earliest != latest:
             parts.append(schedule[[earliest, latest]].copy())
@@ -753,7 +715,7 @@ class IndexCalculator:
         data = self._check_data_set_sched(data, closed)
         even = (self._day % self.frequency) == self._tdzero  # evenly divides day
 
-        if self.align:
+        if self._align:
             assert not self._srt in data, f"Please rename column: {self._srt}."
             data[self._srt] = np.arange(data.shape[0]) # a column with integers showing the original order of the parts
             agg_map[self._srt] = "first"

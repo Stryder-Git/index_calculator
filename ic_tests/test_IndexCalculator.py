@@ -281,11 +281,11 @@ def test_timex_w_breaks():
          '2020-12-24 09:00:00+00:00', '2020-12-24 11:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None))
 
 
-def test_convert_no_align():
+def test_convert():
     nyse = mcal.get_calendar("NYSE", open_time= dt.time(9, 30), close_time= dt.time(12))
     nyse.change_time("pre", dt.time(7))
     nyse.change_time("post", dt.time(14,30))
-    schedule = nyse.schedule("2020-12-22", "2020-12-23", start= "pre", end= "post")
+    schedule = nyse.schedule("2020-12-22", "2021-12-23", start= "pre", end= "post")
     ic = IndexCalculator()
 
     data = _pricedata([ ["2020-12-22 12:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-22 12:30:00", 0.0, 1.0, 2.0, 3.0, 2],
@@ -306,6 +306,8 @@ def test_convert_no_align():
                         ["2020-12-23 18:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 18:30:00", 0.0, 1.0, 2.0, 3.0, 2],
                         ["2020-12-23 19:00:00", 0.0, 1.0, 2.0, 3.0, 2]
                         ], to= nyse.tz, aware= True)
+
+    ### NO ALIGN
 
     # EVENLY DIVIDES DAY
     ic.use(schedule, "2H", start= True, end= False)
@@ -333,6 +335,30 @@ def test_convert_no_align():
 
     assert_frame(new, goal, ic.settings)
 
+
+    # WITH ALIGN
+
+    ic.use(schedule, "2H", start= False, end= "cross", pre= "start")
+    new = ic.convert(data)
+    goal = _pricedata([ ["2020-12-22 12:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                        ["2020-12-22 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-22 16:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-22 18:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-22 20:30:00", 0.0, 1.0, 2.0, 3.0, 4],
+                        ["2020-12-23 12:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-23 16:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-23 18:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-23 20:30:00", 0.0, 1.0, 2.0, 3.0, 4]], to= nyse.tz, aware= True)
+
+    assert_frame(new, goal, ic.settings)
+
+    # WITH ALIGN - closed right
+    data.index = data.index + pd.Timedelta("30min")
+    new = ic.convert(data, closed= "right")
+    assert_frame(new, goal, ic.settings)
+
+
 def test_convert_exceptions():
     # Either start or end must be set to False when using .convert()
     with pytest.raises(InvalidConfiguration) as e1: IndexCalculator(start= True, end= True).convert("")
@@ -358,9 +384,9 @@ def test_dependencies():
 if __name__ == '__main__':
 
     # test_times_with_all_arguments()
-    test_verify_schedule()
-
-    exit()
+    # test_verify_schedule()
+    #
+    # exit()
     for ref, obj in locals().copy().items():
         if ref.startswith("test_"):
             print("running: ", ref)

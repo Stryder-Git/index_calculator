@@ -662,12 +662,13 @@ class IndexCalculator:
         self.__inferred_timeframe = (data.index - data.index.to_series().shift()).mode().iat[0]
         if closed != "left": data.index = data.index - self.__inferred_timeframe
 
-        dmin, dmax = data.index[[0, -1]]
-        dmax += self.__inferred_timeframe
-        if dmin < self.__frm or dmax > self.__to: raise InvalidInput("Schedule doesn't cover the whole data")
+        self.__dmin, self.__dmax = data.index[[0, -1]]
+        dmax = self.__dmax + self.__inferred_timeframe
+        if self.__dmin < self.__frm or dmax > self.__to:
+            raise InvalidInput("Schedule doesn't cover the whole data")
 
         # _sched is needed by the helper functions
-        self._sched = self.schedule[self.schedule.real.ge(dmin) & self.schedule.end.le(dmax)]
+        self._sched = self.schedule[self.schedule.real.ge(self.__dmin) & self.schedule.end.le(dmax)]
         if not self._sched.real.isin(data.index).all():
             raise InvalidInput("You seem to have missing data. This is not refering to NaN values but to "
                                "market times that aren't represented in your data. This may also be because your "
@@ -771,8 +772,8 @@ class IndexCalculator:
                                     ).dropna(how="any"))
 
             new = pd.concat(parts).sort_values(self._srt)
-            new = new.set_index(pd.DatetimeIndex(self._times(self.__frm, self.__to)), drop=True
-                                ).drop(columns=self._srt)
+            tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
+            new = new.set_index(tx, drop=True).drop(columns=self._srt)
         elif even:
             new = data.resample(self.frequency, label=label, origin=self._sched.start.iat[0]
                                 ).agg(agg_map).dropna(how="any")

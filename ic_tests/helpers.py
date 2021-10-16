@@ -14,9 +14,10 @@ def _pricedata(data, frm= "UTC", to= "UTC", aware= True):
     df.index.name = None
     return df
 
-def _timestampseries(data):
-    return pd.Series(data, dtype= "datetime64[ns]"
-                  ).dt.tz_localize("UTC").dt.tz_convert(nysetz).dt.tz_localize(None)
+def _timestampseries(data, from_tz= "UTC", to_tz= None, aware= False):
+    s = pd.Series(data, dtype= "datetime64[ns]"
+                  ).dt.tz_localize(from_tz).dt.tz_convert(to_tz if not to_tz is None else nysetz)
+    return s if aware else s.dt.tz_localize(None)
 
 def _assert(func, new, goal, *args):
     try:

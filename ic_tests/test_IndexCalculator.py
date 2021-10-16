@@ -35,7 +35,7 @@ def test_ways_of_using():
 
     ## FULL INITIALIZATION
     # allows the settings to be reused, which would prepare the schedule ahead of time
-    ic = IndexCalculator(schedule, "2H", pre="start", rth="end", end=True)
+    ic = IndexCalculator(schedule, "2H", market_open="start", market_close="end", end=True)
     assert_index_equal(ic.timex(), goal2H)
 
     # passing a different frequency to .timex() or .times(),
@@ -70,7 +70,7 @@ def test_ways_of_using():
 
     #### PARTIAL INIITALIZATION
     # You can also initalize it without the frequency, preparing it partially.
-    ic = IndexCalculator(schedule, pre="start", rth="end", end=True)
+    ic = IndexCalculator(schedule, market_open="start", market_close="end", end=True)
     # Then you will have to set the frequency when calling .timex() or .times()
     assert_index_equal(ic.timex("2H"), goal2H)
     # Otherwise...
@@ -79,7 +79,7 @@ def test_ways_of_using():
     # Just like before, you can then set a standard frequency to be able to reuse it
     ic.frequency = "3H"
     # by calling the instance directly, you can temporarily change all the settings ...
-    ix = ic(schedule[["market_open", "market_close"]], "2H", pre="end", end= "cross")
+    ix = ic(schedule[["market_open", "market_close"]], "2H", end= "cross")
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 14:30:00+00:00', '2020-12-23 16:30:00+00:00',
          '2020-12-23 18:30:00+00:00', '2020-12-24 14:30:00+00:00',
@@ -92,14 +92,14 @@ def test_ways_of_using():
     ic = IndexCalculator()
     # calling it directly works, but won't keep the settings and
     # will be the slowest, since it has to prepare the settings every time
-    ix = ic(schedule, "2H", pre="start", rth="end", end=True)
+    ix = ic(schedule, "2H", market_open="start", market_close="end", end=True)
     assert_index_equal(ix, goal2H)
     # because settings wouldn't be saved:
     with pytest.raises(InvalidConfiguration): ic.timex()
     with pytest.raises(InvalidConfiguration): ic.times()
 
     # settings can be set by calling .use()
-    ic.use(schedule, "2H", pre="start", rth="end", end=True)
+    ic.use(schedule, "2H", market_open="start", market_close="end", end=True)
     assert_index_equal(ic.timex(), goal2H)
     # and they will be kept
     assert_index_equal(ic.timex(), goal2H)
@@ -115,9 +115,43 @@ def test_verify_schedule():
     nyse.change_time("pre", dt.time(10))
     nyse.change_time("post", dt.time(14, 30))
 
-    schedule = nyse.schedule("2020-01-01", "2020-01-07", market_times= "all")
+    schedule = nyse.schedule("2020-01-01", "2020-01-07", market_times= ["pre", "market_open", "market_close", "post"])
     with pytest.raises(InvalidInput):
         ic = IndexCalculator(schedule)
+
+def test_with_odd_columns():
+    cal = mcal.get_calendar("NYSE", open_time= dt.time(8), close_time=dt.time(10))
+    del cal["pre"]
+    del cal["post"]
+    cal["first"] = dt.time(7)
+    cal["second"] = dt.time(9)
+    cal["third"] = dt.time(11)
+
+    schedule = cal.schedule("2021-10-13", "2021-10-14", market_times= "all")
+    schedule = schedule.rename(columns= {"market_open": "o", "market_close": "c"})
+    schedule = IndexCalculator.set_schedule_tz(schedule, "Europe/Berlin")
+
+    with pytest.raises(InvalidConfiguration):
+        ic = IndexCalculator(schedule, start= False, end= True, first= "start", c= "end")
+
+    ic = IndexCalculator(schedule, frequency= "25min", start= False, end= True,
+                         c= "end", second= "start")
+
+    assert str(ic.schedtz) == "Europe/Berlin"
+
+    assert_index_equal(ic.timex(), pd.DatetimeIndex(
+        ['2021-10-13 13:20:00+02:00', '2021-10-13 13:45:00+02:00',
+         '2021-10-13 14:10:00+02:00', '2021-10-13 14:35:00+02:00',
+         '2021-10-13 15:00:00+02:00', '2021-10-13 15:25:00+02:00',
+         '2021-10-13 15:50:00+02:00', '2021-10-13 16:00:00+02:00',
+         '2021-10-13 16:25:00+02:00', '2021-10-13 16:50:00+02:00',
+         '2021-10-13 17:00:00+02:00', '2021-10-14 13:20:00+02:00',
+         '2021-10-14 13:45:00+02:00', '2021-10-14 14:10:00+02:00',
+         '2021-10-14 14:35:00+02:00', '2021-10-14 15:00:00+02:00',
+         '2021-10-14 15:25:00+02:00', '2021-10-14 15:50:00+02:00',
+         '2021-10-14 16:00:00+02:00', '2021-10-14 16:25:00+02:00',
+         '2021-10-14 16:50:00+02:00', '2021-10-14 17:00:00+02:00'], dtype='datetime64[ns, Europe/Berlin]', freq=None))
+
 
 
 def test_timezone_functionality():
@@ -175,7 +209,7 @@ def test_timex():
 
 #    print(schedule[schedcols].to_string())
 #
-    ic = IndexCalculator(schedule, "2H", pre= "start", rth= "end", end= True)
+    ic = IndexCalculator(schedule, "2H", market_open= "start", market_close= "end", end= True)
     ix = ic.timex()
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 12:00:00+00:00', '2020-12-23 12:30:00+00:00',
@@ -186,7 +220,7 @@ def test_timex():
          '2020-12-24 16:30:00+00:00', '2020-12-24 18:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None))
 
 
-    ic.use(schedule, "2H", pre= "start", rth= "end", end= False)
+    ic.use(schedule, "2H", market_open= "start", market_close= "end", end= False)
     ix = ic.timex()
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 12:00:00+00:00', '2020-12-23 12:30:00+00:00',
@@ -195,7 +229,7 @@ def test_timex():
          '2020-12-24 12:00:00+00:00', '2020-12-24 12:30:00+00:00',
          '2020-12-24 14:30:00+00:00', '2020-12-24 16:30:00+00:00'], dtype='datetime64[ns, UTC]', freq=None))
 
-    ic.use(schedule, "2H", pre= "start", rth= "end", end="cross")
+    ic.use(schedule, "2H", market_open= "start", market_close= "end", end="cross")
     ix = ic.timex()
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 12:00:00+00:00', '2020-12-23 12:30:00+00:00',
@@ -205,7 +239,7 @@ def test_timex():
          '2020-12-24 12:30:00+00:00', '2020-12-24 14:30:00+00:00',
          '2020-12-24 16:30:00+00:00', '2020-12-24 18:30:00+00:00'], dtype='datetime64[ns, UTC]', freq=None))
 
-    ic.use(schedule, "2H", pre= "start", rth= "end", start= False, end= True)
+    ic.use(schedule, "2H", market_open= "start", market_close= "end", start= False, end= True)
     ix = ic.timex()
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 12:30:00+00:00', '2020-12-23 14:30:00+00:00',
@@ -232,7 +266,7 @@ def test_timex():
          '2020-12-24 14:00:00+00:00', '2020-12-24 16:00:00+00:00',
          '2020-12-24 18:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None))
 
-    ic.use(schedule, "2H", pre= "start", start=False, end="cross")
+    ic.use(schedule, "2H", market_open= "start", start=False, end="cross")
     ix = ic.timex()
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 12:30:00+00:00', '2020-12-23 14:30:00+00:00',
@@ -241,7 +275,7 @@ def test_timex():
          '2020-12-24 14:30:00+00:00', '2020-12-24 16:30:00+00:00',
          '2020-12-24 18:30:00+00:00'], dtype='datetime64[ns, UTC]', freq=None))
 
-    ic.use(schedule, "2H", pre="start", start=True, end="cross")
+    ic.use(schedule, "2H", market_open="start", start=True, end="cross")
     ix = ic.timex()
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 12:00:00+00:00', '2020-12-23 12:30:00+00:00',
@@ -260,7 +294,7 @@ def test_timex_w_breaks():
     for col in schedule.columns: schedule[col] = pd.to_datetime(schedule[col], utc= True)
     schedule.index = pd.DatetimeIndex(["2020-12-23", "2020-12-24"])
 
-    ic.use(schedule, "2H", pre= "start", rth= "end", start= False, end= True)
+    ic.use(schedule, "2H", market_open= "start", market_close= "end", start= False, end= True)
     ix = ic.timex()
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 06:30:00+00:00', '2020-12-23 08:30:00+00:00',
@@ -270,7 +304,7 @@ def test_timex_w_breaks():
          '2020-12-24 06:30:00+00:00', '2020-12-24 08:30:00+00:00',
          '2020-12-24 10:30:00+00:00', '2020-12-24 11:00:00+00:00'], dtype='datetime64[ns, UTC]', freq=None))
 
-    ic.use(schedule, "2H", pre= "start", brk= "start", rth= "end", start= False, end= True)
+    ic.use(schedule, "2H", market_open= "start", break_start= "start", market_close= "end", start= False, end= True)
     ix = ic.timex()
     assert_index_equal(ix, pd.DatetimeIndex(
         ['2020-12-23 06:30:00+00:00', '2020-12-23 08:30:00+00:00',
@@ -338,7 +372,7 @@ def test_convert():
 
     # WITH ALIGN
 
-    ic.use(schedule, "2H", start= False, end= "cross", pre= "start")
+    ic.use(schedule, "2H", start= False, end= "cross", market_open= "start")
     new = ic.convert(data)
     goal = _pricedata([ ["2020-12-22 12:30:00", 0.0, 1.0, 2.0, 3.0, 2],
                         ["2020-12-22 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -384,7 +418,7 @@ def test_dependencies():
 if __name__ == '__main__':
 
     # test_times_with_all_arguments()
-    # test_verify_schedule()
+    # test_with_odd_columns()
     #
     # exit()
     for ref, obj in locals().copy().items():

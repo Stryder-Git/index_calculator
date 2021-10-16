@@ -609,10 +609,8 @@ class IndexCalculator:
     def timex(self, frequency=None, frm=None, to=None, tz=None):
         return pd.DatetimeIndex(self.times(frequency=frequency, frm=frm, to=to, tz=tz))
 
-    def __call__(self, schedule, frequency, start=True, end=False,
-                 pre=False, brk=False, rth=False, post=False):
-        with self.use_now(schedule, frequency, start=start, end=end,
-                          pre=pre, brk=brk, rth=rth, post=post):
+    def __call__(self, schedule, frequency, start=True, end=False, **kwargs):
+        with self.use_now(schedule, frequency, start=start, end=end, **kwargs):
             return pd.DatetimeIndex(self._times(self.__frm, self.__to))
 
     __call__.__doc__ = __init__.__doc__

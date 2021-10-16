@@ -55,7 +55,7 @@ def test_convert_pre():
 
             # starts
     ### start = True, end = False
-    ic.use(schedule, "2H", pre= "end", start= True, end= False)
+    ic.use(schedule, "2H", market_open= "end", start= True, end= False)
     goal = _pricedata([ ["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 2],
                         ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -82,7 +82,7 @@ def test_convert_pre():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
-    ic.use(schedule, "2H", pre= "end", start= "cross", end= False)
+    ic.use(schedule, "2H", market_open= "end", start= "cross", end= False)
     goal = _pricedata([ ["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 2],
                         ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -108,7 +108,7 @@ def test_convert_pre():
 
             # ends
     ### start = False, end = True
-    ic.use(schedule, "2H", pre="end", start=False, end=True)
+    ic.use(schedule, "2H", market_open="end", start=False, end=True)
     goal = _pricedata([["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 16:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -134,7 +134,7 @@ def test_convert_pre():
 
 
     ### start = False, end = "cross"
-    ic.use(schedule, "2H", pre="end", start=False, end="cross")
+    ic.use(schedule, "2H", market_open="end", start=False, end="cross")
     goal = _pricedata([["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 16:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -163,7 +163,7 @@ def test_convert_pre():
 
         # starts
     ### start = True, end = False
-    ic.use(schedule, "2H", pre= "start", start= True, end= False)
+    ic.use(schedule, "2H", market_open= "start", start= True, end= False)
     goal = _pricedata([ ["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 2],
                         ["2020-12-23 12:30:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -188,7 +188,7 @@ def test_convert_pre():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
-    ic.use(schedule, "2H", pre= "start", start= "cross", end= False)
+    ic.use(schedule, "2H", market_open= "start", start= "cross", end= False)
     goal = _pricedata([ ["2020-12-23 10:30:00", 0.0, 1.0, 2.0, 3.0, 2],
                         ["2020-12-23 12:30:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -218,7 +218,7 @@ def test_convert_rth():
     ######## RTH = END
             # starts
     ### start = True, end = False
-    ic.use(schedule, "2H", rth= "end", start= True, end= False)
+    ic.use(schedule, "2H", market_close= "end", start= True, end= False)
     goal = _pricedata([ ["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 16:00:00", 0.0, 1.0, 2.0, 3.0, 4],
@@ -242,7 +242,7 @@ def test_convert_rth():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
-    ic.use(schedule, "2H", rth= "end", start= "cross", end= False)
+    ic.use(schedule, "2H", market_close= "end", start= "cross", end= False)
     goal = _pricedata([ ["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 16:00:00", 0.0, 1.0, 2.0, 3.0, 4],
@@ -267,7 +267,7 @@ def test_convert_rth():
 
         # ends
     ### start = False, end = True
-    ic.use(schedule, "2H", rth= "end", start= False, end= True)
+    ic.use(schedule, "2H", market_close= "end", start= False, end= True)
     goal = _pricedata([ ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 16:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 17:00:00", 0.0, 1.0, 2.0, 3.0, 4],
@@ -291,7 +291,7 @@ def test_convert_rth():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     ### start = False, end = "cross"
-    ic.use(schedule, "2H", rth= "end", start= False, end= "cross")
+    ic.use(schedule, "2H", market_close= "end", start= False, end= "cross")
     goal = _pricedata([ ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 16:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 17:00:00", 0.0, 1.0, 2.0, 3.0, 4],
@@ -320,7 +320,7 @@ def test_convert_rth():
 
             # starts
     # start = True, end = False
-    ic.use(schedule, "2H", rth= "start", start= True, end= False)
+    ic.use(schedule, "2H", market_close= "start", start= True, end= False)
     goal = _pricedata([ ["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 4],
                         ["2020-12-23 13:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 15:00:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -344,7 +344,7 @@ def test_convert_rth():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     # start = "cross", end = False
-    ic.use(schedule, "2H", rth="start", start="cross", end=False)
+    ic.use(schedule, "2H", market_close="start", start="cross", end=False)
     goal = _pricedata([["2020-12-23 11:00:00", 0.0, 1.0, 2.0, 3.0, 4],
                        ["2020-12-23 13:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 15:00:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -369,7 +369,7 @@ def test_convert_rth():
 
             # ends
     # start = False, end = True
-    ic.use(schedule, "2H", rth="start", start=False, end=True)
+    ic.use(schedule, "2H", market_close="start", start=False, end=True)
     goal = _pricedata([["2020-12-23 13:00:00", 0.0, 1.0, 2.0, 3.0, 4],
                        ["2020-12-23 15:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 17:00:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -393,7 +393,7 @@ def test_convert_rth():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     # start = False, end = "cross"
-    ic.use(schedule, "2H", rth="start", start=False, end="cross")
+    ic.use(schedule, "2H", market_close="start", start=False, end="cross")
     goal = _pricedata([["2020-12-23 13:00:00", 0.0, 1.0, 2.0, 3.0, 4],
                        ["2020-12-23 15:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 17:00:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -609,7 +609,7 @@ def test_convert_pre_rth():
 
             # starts
     ### start = True, end = False
-    ic.use(schedule, "2H", pre="end", rth= "end", start=True, end=False)
+    ic.use(schedule, "2H", market_open="end", market_close= "end", start=True, end=False)
     goal = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -636,7 +636,7 @@ def test_convert_pre_rth():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
-    ic.use(schedule, "2H", pre="end", rth= "end", start="cross", end=False)
+    ic.use(schedule, "2H", market_open="end", market_close= "end", start="cross", end=False)
     goal = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -664,7 +664,7 @@ def test_convert_pre_rth():
 
             # ends
     ### start = False, end = True
-    ic.use(schedule, "2H", pre="end", rth= "end", start=False, end=True)
+    ic.use(schedule, "2H", market_open="end", market_close= "end", start=False, end=True)
     goal = _pricedata([["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 16:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -691,7 +691,7 @@ def test_convert_pre_rth():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     ### start = False, end = "cross"
-    ic.use(schedule, "2H", pre="end", rth= "end", start=False, end="cross")
+    ic.use(schedule, "2H", market_open="end", market_close= "end", start=False, end="cross")
     goal = _pricedata([["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 16:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -723,7 +723,7 @@ def test_convert_pre_rth():
 
         # starts
     ### start = True, end = False
-    ic.use(schedule, "2H", pre="end", rth= "start", start=True, end=False)
+    ic.use(schedule, "2H", market_open="end", market_close= "start", start=True, end=False)
     goal = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],
@@ -750,7 +750,7 @@ def test_convert_pre_rth():
     assert_series(ic.times(tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
-    ic.use(schedule, "2H", pre="end", rth= "start", start="cross", end=False)
+    ic.use(schedule, "2H", market_open="end", market_close= "start", start="cross", end=False)
     goal = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],

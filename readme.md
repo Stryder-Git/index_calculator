@@ -5,12 +5,15 @@ I just wanted to create. It allows a lot of flexibility when calculating Datetim
 pricedata but, except for my own usage, a lot is still untested.
 
 
-There are two general purposes that this class fulfills while always respecting schedules:
+# Description
 
-    calculating datetime ranges in pd.Series or pd.DatetimeIndexes that follow a specific exchange calendar schedule
+This class aims to provide decently efficient calculations for generating a rich variety of possible datetime ranges.
+The best way to familiarize yourself with the functionality and usage of this class is by having a look at 
+the test `test_ways_of_using` in ic_tests\test_IndexCalculator.py. 
 
-    converting high frequency time series data to lower frequencies, following 
+A brief demonstration:
 
+    
 
 
     

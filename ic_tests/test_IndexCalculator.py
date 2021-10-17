@@ -409,18 +409,122 @@ def test_convert_exceptions():
                 f"This is was the error string: \n{e.exconly()}"
 
 
-def test_dependencies():
 
-    assert IndexCalculator._some_date == pd.Timestamp("1970-01-01 00:00:00")
+
+def test_pricedata_that_should_not_exist():
+    """
+
+    :return:
+    """
+
+    nyse = mcal.get_calendar("NYSE", open_time=dt.time(9, 30), close_time=dt.time(12))
+    nyse.change_time("pre", dt.time(7))
+    nyse.change_time("post", dt.time(14, 30))
+    schedule = nyse.schedule("2020-12-23", "2020-12-28", start="pre", end="post")
+
+    # PRE = 12, MO = 14.30, MC = 17, POST = 19.30
+    schedule = schedule[schedule.index.normalize() != "2020-12-24 00:00:00"]
+
+    ###########################################################################
+    # The pricedata (below) contains Dec 24th but the schedule has that day
+    # removed, which can lead to inconsistent results.
+    ###########################################################################
+
+    left = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 12:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-23 13:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 13:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-23 15:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 15:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-23 16:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 16:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-23 17:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 17:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-23 18:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 18:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-23 19:00:00", 0.0, 1.0, 2.0, 3.0, 2],
+
+                       ["2020-12-24 12:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-24 12:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-24 13:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-24 13:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-24 14:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-24 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-24 15:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-24 15:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-24 16:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-24 16:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-24 17:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-24 17:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+
+                       ["2020-12-28 12:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-28 12:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-28 13:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-28 13:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-28 14:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-28 14:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-28 15:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-28 15:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-28 16:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-28 16:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-28 17:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-28 17:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-28 18:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-28 18:30:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-28 19:00:00", 0.0, 1.0, 2.0, 3.0, 2]
+                       ], to=nyse.tz, aware=True)
+
+    ic = IndexCalculator(schedule)
+
+    # When no alignments chosen and frequency doesn't evenly divide the day,
+    # it will have the issue that there is a day in the pricedata that is not in the schedule
+    with pytest.raises(InvalidInput):
+        _ = ic.convert(left, freq= "2.5H")
+
+    # When no alignments, but frequency evenly divides the day,
+    # it will not have this issue but simply take the first available session start in the schedule
+    # as the origin for a full df agg call
+    two = ic.convert(left, freq= "2H")
+    goal = _pricedata([ ["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-23 16:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-23 18:00:00", 0.0, 1.0, 2.0, 3.0, 6],
+                        ["2020-12-24 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-24 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-24 16:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-28 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-28 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-28 16:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                        ["2020-12-28 18:00:00", 0.0, 1.0, 2.0, 3.0, 6]], to= nyse.tz, aware= True)
+
+    assert_frame(two, goal, ic.settings)
+
+
+    # when alignments are chosen, it doesn't matter if the frequency evenly divides a day, the
+    # day that is not in the schedule will disappear completely, neither warnings nor errors
+    ic.use(schedule, market_open= "start", post= "start")
+    goal = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 10],
+                       ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 10],
+                       ["2020-12-23 17:00:00", 0.0, 1.0, 2.0, 3.0, 10],
+                       ["2020-12-28 12:00:00", 0.0, 1.0, 2.0, 3.0, 10],
+                       ["2020-12-28 14:30:00", 0.0, 1.0, 2.0, 3.0, 10],
+                       ["2020-12-28 17:00:00", 0.0, 1.0, 2.0, 3.0, 10]], to=nyse.tz, aware=True)
+
+    new = ic.convert(left, freq= "2.5H")
+    assert_frame(new, goal, ic.settings)
+
+    goal = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                       ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-23 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                       ["2020-12-23 16:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                       ["2020-12-23 18:30:00", 0.0, 1.0, 2.0, 3.0, 4],
+                       ["2020-12-28 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
+                       ["2020-12-28 14:00:00", 0.0, 1.0, 2.0, 3.0, 2],
+                       ["2020-12-28 14:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                       ["2020-12-28 16:30:00", 0.0, 1.0, 2.0, 3.0, 8],
+                       ["2020-12-28 18:30:00", 0.0, 1.0, 2.0, 3.0, 4]], to=nyse.tz, aware=True)
+
+    new = ic.convert(left, freq= "2H")
+    assert_frame(new, goal, ic.settings)
+
+
+    # unrelated test
+    # freq is lower timeframe than the pricedata
+    with pytest.raises(InvalidConfiguration):
+        _ = ic.convert(left, freq= "12min")
 
 
 
 if __name__ == '__main__':
 
-    # test_times_with_all_arguments()
-    # test_with_odd_columns()
+    # test_pricedata_that_should_not_exist()
     #
-    # exit()
+    # # test_times_with_all_arguments()
+    # # test_with_odd_columns()
+    # #
+
     for ref, obj in locals().copy().items():
         if ref.startswith("test_"):
             print("running: ", ref)

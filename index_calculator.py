@@ -622,6 +622,10 @@ class IndexCalculator:
         self.__inferred_timeframe = (data.index - data.index.to_series().shift()).mode().iat[0]
         if closed != "left": data.index = data.index - self.__inferred_timeframe
 
+        if self.__inferred_timeframe >= self.frequency:
+            raise InvalidConfiguration("the timeframe to convert from needs to be smaller than the timeframe "
+                                       "to convert to")
+
         self.__dmin, self.__dmax = data.index[[0, -1]]
         dmax = self.__dmax + self.__inferred_timeframe
         if self.__dmin < self.__frm or dmax > self.__to:
@@ -676,15 +680,20 @@ class IndexCalculator:
 
     def _resample(self, firstrows, agg_map, label):
         """
-        This will prepare a function that can be applied to each trading day,
+        This will prepare a function that can be applied to each trading session,
         when an uneven tf has been requested.
 
         It will prepare the origin of each day, when creating the function, thereby
         eliminating the need to recalculate it at every iteration
 
+        :param firstrows:
         :param agg_map:
         :return:
         """
+        if not firstrows.isin(self._sched.real).all():
+            raise InvalidInput("There seem to be sessions starts in the pricedata that are not found in the "
+                               "schedule, please make sure the schedule and data match.")
+
         origins = self._sched.loc[self._sched.real.isin(firstrows)]
         origins = origins["start"].set_axis(origins["real"])
         f = self.frequency
@@ -750,14 +759,15 @@ class IndexCalculator:
         """
 
         :param data: dataframe with datetimeindex to convert
-        :param freq: frequency/timeframe to use instead of self.frequency
+        :param freq: frequency/timeframe to use instead of self.frequency (resulting frequency)
         :param agg_map: dictionary to replace self.default_agg_map if desired
         :param closed: on which side the passed `data` is closed
             (not the returned dataframe, that is determined by the start/end configuration of
              the IndexCalculator instance)
-        :param tz: if the datetimeindex is timezone naive this is the timezone it should be interpreted in,
-            will be ignored if the index is timezone aware
-        :return: DataFrame with index in `freq` and data converted according to `agg_map`
+        :param tz: if the datetimeindex of `data` is timezone naive this is the timezone it should
+            be interpreted in, will be ignored if the index is timezone aware
+        :return: DataFrame with index in `freq` and data converted according to `agg_map`, tzinfo will always be the
+            same as the input data
         """
 
 
@@ -780,7 +790,7 @@ class IndexCalculator:
         if not data.index.is_monotonic_increasing: data = data.sort_index()
 
         if agg_map is None:
-            agg_map = self.default_agg_map
+            agg_map = self.default_agg_map.copy()
             data.columns = data.columns.str.lower()
 
         with self._temp(freq):

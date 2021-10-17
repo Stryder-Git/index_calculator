@@ -1,4 +1,4 @@
-##Description
+## Description
 
 This class aims to provide efficient calculations for generating a rich variety of possible datetime ranges.
 The best way to familiarize yourself with the functionality and usage of this class is by having a look at 

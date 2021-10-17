@@ -6,8 +6,6 @@ the test `test_ways_of_using` in [ic_tests\test_IndexCalculator.py](https://gith
 You can also check out [ic_tests\test_IndexCalculator_alignments.py](https://github.com/Stryder-Git/index_calculator/blob/master/ic_tests/test_IndexCalculator_alignments.py)
 to see many examples.
 
-A brief demonstration:
-
 #### CAUTION
 
 This class allows a lot of flexibility but, a lot is still untested.

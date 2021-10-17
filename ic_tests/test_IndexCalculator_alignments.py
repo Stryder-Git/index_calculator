@@ -12,9 +12,9 @@ nyse.change_time("pre", dt.time(7))
 nyse.change_time("post", dt.time(14,30))
 ic = IndexCalculator()
 
-schedule = nyse.schedule("2020-12-23", "2020-12-28", start="pre", end="post")
+schedule = nyse.schedule("2020-12-23", "2021-12-28", start="pre", end="post")
 
-print(schedule[["pre", "market_open", "market_close", "post"]].to_string())
+print(schedule[["pre", "market_open", "market_close", "post"]].head().to_string())
 
 # to avoid confusion when reading this, the datetime literals are written in UTC, but they will
 # be converted to nyse.tz in _pricedata, to always include tz conversions in the process.
@@ -46,7 +46,14 @@ left = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 
                    ], to= nyse.tz, aware= True)
 right = left.set_index(left.index + pd.Timedelta("30min"))
 
-print(left)
+
+first, last, _last = "2020-12-23 12:00:00", "2020-12-28 15:00:00", "2021-12-28"
+
+def test_cached_data():
+    ic.use(schedule, frequency= "1H")
+    ix = nyse.schedule(pd.Timestamp(last) + pd.Timedelta("1D"), _last).index
+    assert ix.isin(ic.timex().normalize().tz_localize(None)).all()
+
 # PRE 12 OPEN 14.30 CLOSE 17 POST 19.30
 
 def test_convert_pre():
@@ -78,8 +85,8 @@ def test_convert_pre():
         ic.convert(left.tz_localize(None), tz= nyse.tz), goal.tz_localize(None), ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
     ic.use(schedule, "2H", market_open= "end", start= "cross", end= False)
@@ -103,8 +110,8 @@ def test_convert_pre():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
             # ends
     ### start = False, end = True
@@ -129,8 +136,8 @@ def test_convert_pre():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 
     ### start = False, end = "cross"
@@ -155,8 +162,8 @@ def test_convert_pre():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 
     ####### PRE = START
@@ -184,8 +191,8 @@ def test_convert_pre():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
     ic.use(schedule, "2H", market_open= "start", start= "cross", end= False)
@@ -209,8 +216,8 @@ def test_convert_pre():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 
 def test_convert_rth():
@@ -238,8 +245,8 @@ def test_convert_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
     ic.use(schedule, "2H", market_close= "end", start= "cross", end= False)
@@ -262,8 +269,8 @@ def test_convert_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
         # ends
     ### start = False, end = True
@@ -287,8 +294,8 @@ def test_convert_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = False, end = "cross"
     ic.use(schedule, "2H", market_close= "end", start= False, end= "cross")
@@ -311,8 +318,8 @@ def test_convert_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 
 
@@ -340,8 +347,8 @@ def test_convert_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     # start = "cross", end = False
     ic.use(schedule, "2H", market_close="start", start="cross", end=False)
@@ -364,8 +371,8 @@ def test_convert_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
             # ends
     # start = False, end = True
@@ -389,8 +396,8 @@ def test_convert_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     # start = False, end = "cross"
     ic.use(schedule, "2H", market_close="start", start=False, end="cross")
@@ -413,8 +420,8 @@ def test_convert_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 def test_convert_post():
 
@@ -439,8 +446,8 @@ def test_convert_post():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
     ic.use(schedule, "2H", post= "end", start= "cross", end= False)
@@ -461,8 +468,8 @@ def test_convert_post():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
         # ends
     ### start = False, end = True
@@ -484,8 +491,8 @@ def test_convert_post():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = False, end = "cross"
     ic.use(schedule, "2H", post= "end", start= False, end= "cross")
@@ -506,8 +513,8 @@ def test_convert_post():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame( # right
         ic.convert(right, tz= nyse.tz, closed= "right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 
 
@@ -533,8 +540,8 @@ def test_convert_post():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     # start = "cross", end = False
     ic.use(schedule, "2H", post="start", start="cross", end=False)
@@ -555,8 +562,8 @@ def test_convert_post():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
             # ends
     # start = False, end = True
@@ -578,8 +585,8 @@ def test_convert_post():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     # start = False, end = "cross"
     ic.use(schedule, "2H", post="start", start=False, end="cross")
@@ -600,8 +607,8 @@ def test_convert_post():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 
 def test_convert_pre_rth():
@@ -632,8 +639,8 @@ def test_convert_pre_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
     ic.use(schedule, "2H", market_open="end", market_close= "end", start="cross", end=False)
@@ -659,8 +666,8 @@ def test_convert_pre_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
             # ends
     ### start = False, end = True
@@ -687,8 +694,8 @@ def test_convert_pre_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = False, end = "cross"
     ic.use(schedule, "2H", market_open="end", market_close= "end", start=False, end="cross")
@@ -714,8 +721,8 @@ def test_convert_pre_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 
     ####### PRE = END,      RTH = START
@@ -746,8 +753,8 @@ def test_convert_pre_rth():
         ic.convert(left, tz=nyse.tz), goal, ic.settings)
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
     ### start = "cross", end = False
     ic.use(schedule, "2H", market_open="end", market_close= "start", start="cross", end=False)
@@ -774,17 +781,13 @@ def test_convert_pre_rth():
     assert_frame(  # right
         ic.convert(right, tz=nyse.tz, closed="right"), goal, ic.settings)
 
-    assert_index(ic.timex(tz= nyse.tz), goal.index)
-    assert_series(ic.times(tz= nyse.tz), goal.index)
+    assert_index(ic.timex(frm= first,to= last, tz= nyse.tz), goal.index)
+    assert_series(ic.times(frm= first,to= last, tz= nyse.tz), goal.index)
 
 
 
 if __name__ == '__main__':
     ####### PRE = END,      RTH = START
-
-
-
-
 
     for ref, obj in locals().copy().items():
         if ref.startswith("test_"):

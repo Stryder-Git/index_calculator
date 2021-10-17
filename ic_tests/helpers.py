@@ -2,7 +2,6 @@ import pandas as pd
 import pandas_market_calendars as mcal
 from pandas.testing import assert_index_equal, assert_frame_equal, assert_series_equal
 
-schedcols = "pre market_open market_close post".split()
 pricecols = "date open high low close volume".split()
 nysetz = mcal.get_calendar("NYSE").tz
 

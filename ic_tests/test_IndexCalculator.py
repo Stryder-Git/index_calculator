@@ -1,5 +1,5 @@
 
-from ic_tests.helpers import _pricedata, schedcols, assert_frame
+from ic_tests.helpers import _pricedata, assert_frame
 from index_calculator import IndexCalculator, InvalidConfiguration, InvalidInput
 
 import pandas as pd

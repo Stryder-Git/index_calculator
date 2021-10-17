@@ -358,8 +358,6 @@ class IndexCalculator:
         :param post:
         """
         self._freq = None if frequency is None else pd.Timedelta(frequency)
-        self.has_breaks = False if schedule is None else ("break_start" in schedule
-                                                          and "break_end" in schedule)
 
         if not (start in self._valid_start_end and end in self._valid_start_end):
             raise InvalidConfiguration("start and end can only be True, False or 'cross'")
@@ -367,8 +365,6 @@ class IndexCalculator:
         _vals = kwargs.values()
         if not all([x in ("start", "end", False) for x in kwargs.values()]):
             raise InvalidConfiguration("market_times borders must be 'start', 'end' or False")
-
-
 
         self.start = start
         self.end = end

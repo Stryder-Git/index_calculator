@@ -90,20 +90,3 @@ dtype: datetime64[ns, UTC]
 
 ```
 
-t
-t
-t
-t
-
-t
-t
-t
-
-
-    
-
-
-    
-
-
-

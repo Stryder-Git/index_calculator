@@ -2,7 +2,7 @@
 #### CAUTION
 
 This project has mostly been created for my own enjoyment and can probably be broken easily. Do not blindly rely 
-on these calculations since tests and documentation are still underdeveloped. 
+on these calculations since tests and documentation are still underdeveloped or non-existent. 
 
 Particular caution when...
 * using highly customized schedules

@@ -358,7 +358,8 @@ class IndexCalculator:
                                "timeframe is too large.")
         return data
 
-    def _gen_parts_origin(self, data):
+
+    def _group_parts_origin(self, data):
         """
         This generator will group the requested parts/sessions in `sched` by
         their start and end times and use those to yield the required subsections of `data`.
@@ -381,50 +382,19 @@ class IndexCalculator:
         end = self._sched.end.set_axis(self._sched.end - self.__inferred_timeframe)
         end = end - end.dt.normalize()
 
-        try:
-            data.loc[real.index, self._ssnstart] = real
-            data.loc[end.index, self._ssnend] = end
-        except KeyError as e:
-            m = "There are session starts and/or ends in the schedule that are not found in the pricedata"
-            raise InvalidInput(m) from e
+        origins = self._sched.start.set_axis(real.index)
+        return data.groupby([real.reindex(data.index).ffill(),
+                             end.reindex(data.index).bfill()]), origins
 
-        starts = self._sched.start.set_axis(real.index)
+    def _group_first(self, data):
+        ix = data.index.to_series()
+        starts = (ix - ix.shift()).le(self.__inferred_timeframe)
+        grp = data.groupby(ix.where(~starts, None).ffill())
+        return grp, data.index[grp.cumcount().eq(0)]
 
-        data[self._ssnstart] = data[self._ssnstart].ffill()
-        data[self._ssnend] = data[self._ssnend].bfill()
-
-        grps = data.groupby([self._ssnstart, self._ssnend])
-        for (real, end), part in grps:
-            print(real, end)
-            # start_dates = self._sched.loc[index, "real"].dt.normalize()  # real start_dates
-            # end_dates = self._sched.loc[index, "end"].dt.normalize()  # real end_dates
-            #
-            # # get the part based on the real start
-            # part = data.between_time((self._some_date + real).time(),
-            #                          (self._some_date + end).time(),
-            #                          include_start=True, include_end=False)
-            #
-            # ixdf = self.timex().to_frame(name= "timex").between_time((self._some_date + real).time(),
-            #                                                   (self._some_date + end).time(),
-            #                                                   include_start=True, include_end=False)
-            #
-            # ix = part.index.normalize()  # dates in the part
-            # part = part[ix.isin(start_dates) | ix.isin(end_dates)]  # drop any dates that don't match
-            #
-            # _ix = ixdf.index.normalize()
-            # print(part.shape, ixdf[_ix.isin(start_dates) | _ix.isin(end_dates)].shape)
-
-            # print(part)
-            print(part)
-            if not part.empty:  # use the calced start as origin
-                print(part.index[0])
-                start = starts.at[part.index[0]]
-                yield part, part.index[0].normalize() + (start - start.normalize())
-
-    def _resample(self, firstrows, agg_map, label):
+    def _grouped_resample(self, data):
         """
-        This will prepare a function that can be applied to each trading session,
-        when an uneven tf has been requested.
+        This will handle uneven tfs, by splitting into sesssions
 
         It will prepare the origin of each day, when creating the function, thereby
         eliminating the need to recalculate it at every iteration
@@ -433,27 +403,23 @@ class IndexCalculator:
         :param agg_map:
         :return:
         """
+        grp, firstrows = self._group_first(data)
         if not firstrows.isin(self._sched.real).all():
-            raise InvalidInput("There seem to be sessions starts in the pricedata that are not found in the "
+            raise InvalidInput("There seem to be part starts in the pricedata that are not found in the "
                                "schedule, please make sure the schedule and data match.")
 
-        origins = self._sched.loc[self._sched.real.isin(firstrows)]
-        origins = origins["start"].set_axis(origins["real"])
+        origins = self._sched.loc[firstrows, "start"]
+        origins = origins.set_axis(origins["real"])
         f = self.frequency
 
         def __new(df):
-            return df.resample(f, origin=origins.at[df.index[0]], label=label
-                               ).agg(agg_map)
+            return df.resample(f, origin=origins.at[df.index[0]], label=self.__label
+                               ).agg(self.__agg_map)
 
         return __new
 
-    def _group_first(self, data):
-        ix = data.index.to_series()
-        starts = (ix - ix.shift()).le(self.__inferred_timeframe)
-        grp = data.groupby(ix.where(~starts, None).ffill())
-        return grp, data.index[grp.cumcount().eq(0)]
 
-    def _convert(self, data, agg_map, closed):
+    def _convert(self, data, closed):
         """
         :param data:
         :param tz:
@@ -461,30 +427,23 @@ class IndexCalculator:
         :param closed:
         :return:
         """
-        label = "left" if self.start else "right"
+        self.__label = "left" if self.start else "right"
         data = self._check_data_set_sched(data, closed)
         even = (self._day % self.frequency) == self._tdzero  # evenly divides day
 
         if self._align:
             assert not self._srt in data, f"Please rename column: {self._srt}."
             data[self._srt] = np.arange(data.shape[0]) # a column with integers showing the original order of the parts
-            agg_map[self._srt] = "first"
-            parts = []
-            print("starting for loop")
+            self.__agg_map[self._srt] = "first"
+            parts, origin = self._group_parts_origin(data)
             if even:
-                for part, origin in self._gen_parts_origin(data):
-                    parts.append(
-                        part.resample(self.frequency, origin=origin, label=label
-                                      ).agg(agg_map
-                                            ).dropna(how="any"))
+                new = parts.resample(self.frequency, origin="start", label=self.__label
+                                      ).agg(self.__agg_map
+                                            ).dropna(how="any")
             else:
-                for part, origin in self._gen_parts_origin(data):
-                    group, first = self._group_first(part)
-                    parts.append(
-                        group.apply(self._resample(first, agg_map, label)
-                                    ).dropna(how="any"))
+                new = parts.apply(self._grouped_resample)
 
-            new = pd.concat(parts).sort_values(self._srt)
+            new = new.sort_values(self._srt)
             # print(new)
 
             tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
@@ -493,15 +452,15 @@ class IndexCalculator:
             new = new.set_index(tx, drop=True).drop(columns=self._srt)
 
         elif even:
-            new = data.resample(self.frequency, label=label, origin=self._sched.start.iat[0]
-                                ).agg(agg_map).dropna(how="any")
+            new = data.resample(self.frequency, label=self.__label, origin=self._sched.start.iat[0]
+                                ).agg(self.__agg_map).dropna(how="any")
         else:
             group, first = self._group_first(data)
-            new = group.apply(self._resample(first, agg_map, label)
-                              ).droplevel(0).dropna(how="any")
+            new = group.resample(self.frequency).dropna(how="any")
 
         new.index.freq = None
         return new
+
 
     def convert(self, data, freq=None, agg_map=None, closed="left", tz=None):
         """
@@ -538,11 +497,12 @@ class IndexCalculator:
         if not data.index.is_monotonic_increasing: data = data.sort_index()
 
         if agg_map is None:
-            agg_map = self.default_agg_map.copy()
+            self.__agg_map = self.default_agg_map.copy()
             data.columns = data.columns.str.lower()
+        else: self.__agg_map = agg_map
 
         with self._temp(freq):
-            new = self._convert(data, agg_map, closed).tz_convert(tz)
+            new = self._convert(data, closed).tz_convert(tz)
             # return self._convert(data, agg_map, closed)
 
         if is_aware: return new

@@ -411,6 +411,13 @@ class IndexCalculator:
         if self._freq is None: raise InvalidConfiguration("You never defined a frequency")
         return self._freq
 
+    @frequency.setter
+    def frequency(self, frequency):
+        self.clear()
+        self._freq = pd.Timedelta(frequency)
+        self.schedule["start"] = self.schedule.real  # replace calced_starts with real one
+        self._adjust_start_inplace(self.schedule)
+
     def _adjust_start_inplace(self, schedule):
         """adjusts start column and deletes _change column in place"""
         if self._freq is None: return
@@ -421,17 +428,6 @@ class IndexCalculator:
             schedule.loc[schedule._change, "start"] = schedule.start - adj  # extend it
 
         del schedule["_change"]
-
-    @frequency.setter
-    def frequency(self, frequency):
-        self.clear()
-        self._freq = pd.Timedelta(frequency)
-        if not "_change" in self.schedule:
-            # _change is left in there if the start column has never been calculated
-            # (i.e.: partially initialized without frequency)
-            self.schedule["_change"] = self.schedule.start.ne(self.schedule.real)  # mark what needs to adj
-        self.schedule["start"] = self.schedule.real  # replace calced_starts with real one
-        self._adjust_start_inplace(self.schedule)
 
     @property
     def settings(self):
@@ -737,8 +733,12 @@ class IndexCalculator:
                                     ).dropna(how="any"))
 
             new = pd.concat(parts).sort_values(self._srt)
+            print(new)
+
             tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
-            new = new.set_index(tx, drop=True).drop(columns=self._srt)
+            print(tx)
+            new = (new, tx)
+            # new = new.set_index(tx, drop=True).drop(columns=self._srt)
 
         elif even:
             new = data.resample(self.frequency, label=label, origin=self._sched.start.iat[0]
@@ -748,7 +748,7 @@ class IndexCalculator:
             new = group.apply(self._resample(first, agg_map, label)
                               ).droplevel(0).dropna(how="any")
 
-        new.index.freq = None
+        # new.index.freq = None
         return new
 
     def convert(self, data, freq=None, agg_map=None, closed="left", tz=None):
@@ -790,7 +790,8 @@ class IndexCalculator:
             data.columns = data.columns.str.lower()
 
         with self._temp(freq):
-            new = self._convert(data, agg_map, closed).tz_convert(tz)
+            # new = self._convert(data, agg_map, closed).tz_convert(tz)
+            return self._convert(data, agg_map, closed)
 
         if is_aware: return new
         return new.tz_localize(None)

@@ -89,20 +89,7 @@ class IndexCalculator:
         self._adj = (self.start is not False or self.end != "cross" or any((x == "end" for x in _vals)))
         self._align = any(_vals)
 
-        if schedule is None:
-            self.schedtz = self.SCHEDTZ
-            self.schedule = pd.DataFrame(columns=["real", "start", "end", "session"])
-            self.__frm = self.__to =  self._some_date
-        else:
-            self._verify_schedule(schedule)
-            if schedule.columns[0] in kwargs or "break_end" in kwargs:
-                raise InvalidConfiguration("Sessions start cannot be borders")
-
-            self.schedtz = schedule.iloc[:, 0].dt.tz
-            self.schedule = self._create_sessions_and_parts(schedule)
-            self.__frm = self.schedule.real.iat[0]
-            self.__to = self.schedule.end.iat[-1]
-
+        self.schedule = schedule # see @schedule.setter
         self.clear()
 
     use = __init__
@@ -117,26 +104,38 @@ class IndexCalculator:
         self.use(schedule=schedule, frequency=frequency, start=start, end=end, **kwargs)
         yield
         self.use(schedule=None, **original_settings)  # passing None and setting it directly,
-        self.schedule = original_schedule  # bypasses the calculation
+        self._schedule = original_schedule  # bypasses the calculation
         self.schedtz = original_tz
         self.__frm = frm
         self.__to = to
 
     @property
+    def settings(self):
+        return dict(frequency=self._freq, start=self.start, end=self.end, **self._aligns)
+
+    @property
+    def schedule(self): return self._schedule
+
+    @schedule.setter
+    def schedule(self, schedule):
+        if schedule is None:
+            self.schedtz = self.SCHEDTZ
+            self._schedule = pd.DataFrame(columns=["real", "start", "end", "session"])
+            self.__frm = self.__to =  self._some_date
+        else:
+            self._verify_schedule(schedule)
+            if schedule.columns[0] in self._aligns or "break_end" in self._aligns:
+                raise InvalidConfiguration("Sessions start cannot be borders")
+
+            self.schedtz = schedule.iloc[:, 0].dt.tz
+            self._schedule = self._create_sessions_and_parts(schedule)
+            self.__frm = self.schedule.real.iat[0]
+            self.__to = self.schedule.end.iat[-1]
+
+    @property
     def frequency(self):
         if self._freq is None: raise InvalidConfiguration("You never defined a frequency")
         return self._freq
-
-    def _adjust_start_inplace(self, schedule):
-        """adjusts start column and deletes _change column in place"""
-        if self._freq is None: return
-
-        if schedule._change.any():  # adjust the start values if any "start"'s were requested
-            adj = (schedule.end - schedule.start) % self.frequency  # calc the part left to fill
-            adj.loc[adj.ne(self._tdzero)] = self.frequency - adj
-            schedule.loc[schedule._change, "start"] = schedule.start - adj  # extend it
-
-        del schedule["_change"]
 
     @frequency.setter
     def frequency(self, frequency):
@@ -149,9 +148,17 @@ class IndexCalculator:
         self.schedule["start"] = self.schedule.real  # replace calced_starts with real one
         self._adjust_start_inplace(self.schedule)
 
-    @property
-    def settings(self):
-        return dict(frequency=self._freq, start=self.start, end=self.end, **self._aligns)
+
+    def _adjust_start_inplace(self, schedule):
+        """adjusts start column and deletes _change column in place"""
+        if self._freq is None: return
+
+        if schedule._change.any():  # adjust the start values if any "start"'s were requested
+            adj = (schedule.end - schedule.start) % self.frequency  # calc the part left to fill
+            adj.loc[adj.ne(self._tdzero)] = self.frequency - adj
+            schedule.loc[schedule._change, "start"] = schedule.start - adj  # extend it
+
+        del schedule["_change"]
 
     def _create_sessions_and_parts(self, schedule):
         """

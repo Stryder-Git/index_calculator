@@ -94,7 +94,7 @@ class IndexCalculator:
         self._aligns = kwargs
         self._adj = (self.start is not False or self.end != "cross" or any((x == "end" for x in _vals)))
         self._align = any(_vals)
-
+        print("setting schedule")
         self.schedule = schedule # see @schedule.setter
 
     use = __init__
@@ -158,8 +158,6 @@ class IndexCalculator:
             adj = (schedule.end - schedule.start) % self.frequency  # calc the part left to fill
             adj.loc[adj.ne(self._tdzero)] = self.frequency - adj
             schedule.loc[schedule._change, "start"] = schedule.start - adj  # extend it
-
-        del schedule["_change"]
 
     @property
     def settings(self):
@@ -335,6 +333,7 @@ class IndexCalculator:
     __call__.__doc__ = __init__.__doc__
 
     def _check_data_set_sched(self, data, closed):
+        print("checking data")
         if data.isna().any().any():
             raise InvalidInput("Please handle the missing values in the data before using this method")
 
@@ -350,6 +349,7 @@ class IndexCalculator:
         if self.__dmin < self.__frm or dmax > self.__to:
             raise InvalidInput("Schedule doesn't cover the whole data")
 
+        print("preparing self._sched")
         # _sched is needed by the helper functions
         self._sched = self.schedule[self.schedule.real.ge(self.__dmin) & self.schedule.end.le(dmax)]
         if not self._sched.real.isin(data.index).all():
@@ -388,10 +388,13 @@ class IndexCalculator:
             m = "There are session starts and/or ends in the schedule that are not found in the pricedata"
             raise InvalidInput(m) from e
 
-        data[[self._ssnstart, self._ssnend]] = data[[self._ssnstart, self._ssnend]].ffill()
-        grps = data.groupby([self._ssnstart, self._ssnend]).groups
+        starts = self._sched.start.set_axis(real.index)
 
-        for (real, end), index in grps.items():
+        data[self._ssnstart] = data[self._ssnstart].ffill()
+        data[self._ssnend] = data[self._ssnend].bfill()
+
+        grps = data.groupby([self._ssnstart, self._ssnend])
+        for (real, end), part in grps:
             print(real, end)
             # start_dates = self._sched.loc[index, "real"].dt.normalize()  # real start_dates
             # end_dates = self._sched.loc[index, "end"].dt.normalize()  # real end_dates
@@ -412,9 +415,10 @@ class IndexCalculator:
             # print(part.shape, ixdf[_ix.isin(start_dates) | _ix.isin(end_dates)].shape)
 
             # print(part)
-            part = data.loc[index]
+            print(part)
             if not part.empty:  # use the calced start as origin
-                start = self._sched.at[index[0], "start"]
+                print(part.index[0])
+                start = starts.at[part.index[0]]
                 yield part, part.index[0].normalize() + (start - start.normalize())
 
     def _resample(self, firstrows, agg_map, label):
@@ -466,6 +470,7 @@ class IndexCalculator:
             data[self._srt] = np.arange(data.shape[0]) # a column with integers showing the original order of the parts
             agg_map[self._srt] = "first"
             parts = []
+            print("starting for loop")
             if even:
                 for part, origin in self._gen_parts_origin(data):
                     parts.append(

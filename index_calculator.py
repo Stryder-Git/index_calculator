@@ -4,303 +4,24 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 
-"""
-What does each instance need?
-
-    An order of market_times
-    
-    Session end market_times
-    
-
-
-"""
-
-
 
 class IndexCalculator:
     """
-    This class is capable of calculating a DatetimeIndex respecting any market schedule, retruning all valid Timestamps
-     at the frequency given. The schedule values are assumed to be in UTC.
+    An IndexCalculator is capable of calculating datetime ranges respecting exchange schedules.
 
-    The calculations will be made for each trading session. If the passed schedule-DataFrame doesn't have
-    breaks, there is one trading session per day going from market_open to market_close. Otherwise there are two,
-    the first one going from market_open to break_start and the second one from break_end to market_close.
+    Important notes:
+    * the columns of the schedule need to be sorted such that col_n <= col_n+1
+    * left/right closed are set using the `start` and `end` keywards
+    * any column (except the first or "break_end", which are session starts) can be aligned on, which
+        is done by passing the column name as a kwarg to __init__
+    * when passing a column name to __init__ the argument value must be "start" or "end", indicating where
+        the remainder will be put if its not an even divide
 
-    *Any trading session where start == end is considered a 'no-trading session' and will always be dropped*
+    * pricedata conversions can follow the same configurations except that either start or end must be False
 
-    Trading sessions can be divided into parts:
+    For more illustrations, please check out the tests
 
-        Without breaks:              E.g.: NYSE (pre = 4, open = 9.30,
-                                                  close = 16, post = 20)
-            part 1: [pre - open]        4 - 9.30    pre
-            part 2: [open - close]      9.30 - 16   rth
-            part 3: [close - post]      16 - 20     post
-            --> end of the only trading session
 
-
-        With breaks:                    E.g. XHKG   (pre = 1, open = 2, break_start = 4,
-                                                        break_end = 5, close = 8,  post = 9)
-                                                        Controlled by:
-            part 1: [pre - open]            1 - 2       pre =
-            part 2: [pre - breakstart]      2 - 4       break =        / rth
-            --> end of the first trading session
-            part 3: [breakend - close]      5 - 8       rth =
-            part 4: [close - post]          8 - 9       post =
-            --> end of the second trading session
-
-    * how about continuous?
-
-    PERMUTATIONS
-        E.g.: pre 7, open 9.30, close 12, post 14.30  freq= "2H"
-
-    closed = "left"/"right"/None
-    if closed is None:
-        if force_start is None:
-            force_start = True
-        if force_end is None:
-            force_end = True
-
-    elif closed == "left":
-         if force_start is None:
-            force_start = True
-         if force_end is None:
-            force_end = False
-
-    elif closed == "right":
-         if force_start is None:
-            force_start = False
-         if force_end is None:
-            force_end = True
-
-            <----->
-    force_start = True/False/"cross"/None
-    force_end = True/False/"cross"/None
-        --> force_start/force_end will override the first value of pre(/rth)
-         and the last value of (rth/)post
-         * When passing None, these will be adjusted to fit the closed parameter:
-            closed = "left" -> force_start = True, force_end = False
-            closed = "right" -> force_start = False, force_end = True
-
-    [Optional Choice]
-        pre = "start"/"end"
-        (break) = "start"/"end"
-        rth = "start"/"end"
-        post = "start"/"end"
-    """
-    """
-        # no settings
-            (7, ,7) 9, 11, 13, (14.30, ,15)
-
-        # pre
-            end
-            (7, ,7) 9, 9.30, 11.30, 13.30, (14.30, ,15.30)
-            start
-            (7, ,5.30) 7.30, 9.30, 11.30, 13.30, (14.30, ,15.30)
-
-        # rth
-            end
-            (7, ,7) 9, 11, 12, 14, (14.30, ,16)
-            start
-            (7, , 6) 8, 10, 12, 14, (14.30, ,16)
-
-        post
-            end
-            (7, , 7), 9, 11, 13, (14.30, ,15)
-            start
-            (7, , 6.30), 8.30, 10.30, 12.30, (14.30, ,14.30)
-
-        ##### COMBOS
-        * pre/rth
-        * pre/post
-        * rth/post
-        * pre/rth/post
-
-        # pre + rth
-                pre = "end", rth= "end"
-            (7, ,7) 9, 9.30, 11.30, 12, 14, (14.30, ,16)
-                    pre = "end", rth= "start"
-            (7, ,7) 9, 9.30, 10, 12, 14, (14.30, ,16)
-                    pre = "start", rth= "end"
-            (7, ,5.30) 7.30, 9.30, 11.30, 12, 14, (14.30, ,16)
-                    pre = "start", rth= "start"
-            (7, ,5.30) 7, 7.30, 9.30, 10, 12, 14, (14.30, ,16)
-
-
-        # pre + post
-
-                pre= "end", post = "end"
-            (7, ,7) 9, 9.30, 11.30, 13.30, (14.30, ,15.30)
-                pre = "end", post = "start"
-            (7, ,7) 9, 9.30, 10.30, 12.30, (14.30, ,14.30)
-                pre = "start", post = "end"
-            (7, ,5.30), 7.30, 9.30, 11.30, 13.30, (14.30, ,15.30)
-                pre = "start", post = "start"
-            (7, ,5.30), 7.30, 9.30, 10.30, 12.30, (14.30, ,14.30)
-
-
-        # rth + post
-
-                rth= "end", post = "end"
-            (7, ,7) 9, 11, 12, 14, (14.30, ,16)
-                rth = "end", post = "start"
-            (7, ,7) 9, 11, 12, 12.30, (14.30, ,14.30)
-                rth = "start", post = "end"
-            (7, ,6), 8, 10, 12, 14, (14.30, ,16)
-                rth = "start", post = "start"
-            (7, ,6), 8, 10, 12, 12.30, (14.30, ,14.30)
-
-
-        # pre + rth + post
-
-                pre="end" rth= "end", post = "end"
-            (7, ,7) 9, 9.30, 11.30, 12, 14, (14.30, ,16)
-                pre="end" rth = "end", post = "start"
-            (7, ,7) 9, 9.30, 11.30, 12, 12.30, (14.30, ,14.30)
-                pre="end" rth = "start", post = "end"
-            (7, ,7) 9, 9.30, 10, 12, 14, (14.30, ,16)
-
-                pre="start", rth = "end", post = "end"
-            (7, ,5.30), 7.30, 9.30, 11.30, 12, 14, (14.30, ,16)
-                pre="start" rth = "end", post = "start"
-            (7, ,5.30), 7.30, 9.30, 11.30, 12, 12.30, (14.30, ,14.30)
-                pre="start" rth = "start", post = "end"
-            (7, ,5.30), 7.30, 9.30, 10, 12, 14, (14.30, ,16)
-
-
-
-        with breaks??
-
-            the first trading session has the parts pre and break
-            the second trading session has the parts rth and post
-            --> force_start/force_end are applied to the start and end of EACH SESSION
-
-             there will be overlap checks and limitations
-
-
-        THREE USECASES:
-            * calculate index
-                * simple (no settings)
-
-                * complex (use certain settings)
-                        basically anything can be done
-
-
-            * change timeframe of existing data
-                * simple (no settings)
-
-                * complex (use certain settings)
-                    * detect tf settings
-                    * use passed settings
-
-                    certain ways of handling odd settings will need to be specified
-
-
-            * convert timeframe settings
-
-                * complex (use passed settings)
-
-
-    """
-
-    """
-        CALCULATION
-
-            for either usecase, I will need to determine the start and end of each section that I will calulate with
-                if no settings:
-                    start = session_start (pre/market_open)
-                    end = session_end (break_start/post)
-
-            1. calc index
-
-                7, 14.30
-
-                    calc n_bars, repeat
-                    7
-                    7 9
-                    7 11
-                    7 13
-                    ...
-                    grpby.cumcount, add tf, done
-
-
-
-                if I want pre= "end", rth= "start", post = None
-
-
-
-                    7, 9.30
-                    9.30, 12
-                    12, 14.30 
-                    adjust to align
-                    7, 9.30     <<<-- If "end", use real_start     ## otherwise calculate the calced_start and keep it
-                    8, 12       <<<-- If "start", use calced_start
-                    12, 14.30   <<<-- If not, use real_start      ## otherwise calculate the calced_end and keep it
-
-                        (
-                        if (pre = "start" and force_start= "cross"):
-                            keep calced_start
-                        if (post = "end" and force_end= "cross"):
-                            keep calced_end
-                        )
-
-                    calc_n_bars(groupby.cumcount + 1) * tf
-                    7 9
-                    7 11  (replace)
-
-                    8   10
-                    8   12
-
-                    12  14
-                    12  16
-
-                if force_start
-                    = True
-                    concatenate session starts, drop_duplicates
-                    = False
-                    drop anything smaller *or equal* to the session starts
-                    = "cross"
-                    concatentate calced_starts, drop_duplicates
-
-                if force_end
-                    = True
-                    concatenate session ends, drop_duplicates
-                    = False
-                    drop anything larger *or equal* to the session ends
-                    = "cross"
-                    concatenate calced_ends, drop_duplicates
-
-
-
-            2. change timeframe
-
-                7, 14.30
-
-                no settings
-                    I would call resample.agg on the whole df
-                    (unless it doesn't evenly divide, then I would do it per day)
-
-
-                if I want pre= "end", rth= "start", post = None
-
-                    7, 9.30
-                    9.30, 12
-                    12, 14.30
-
-                    if (pre = "start" and force_start= "cross"):
-                        the function creating the resampler will set the origin to calced_start
-
-                    if (post = "end" and force_end= "cross"):
-
-
-
-
-
-                pre "start", rth = None, post = "end"
-
-                    7, 9.30    (5.30)
-                    9.30, 14.30     (15.30)
-
-                    --> I need a function to set up these borders
 
     """
 
@@ -334,6 +55,10 @@ class IndexCalculator:
     def set_schedule_tz(cls, schedule, to_tz, from_tz= None):
         schedule = schedule.copy()
         for col in schedule:
+            if from_tz is False:
+                schedule[col] = schedule[col].dt.tz_localize(None).dt.tz_localize(to_tz)
+                continue
+
             try:
                 schedule[col] = schedule[col].dt.tz_convert(to_tz)
             except TypeError as e:
@@ -348,14 +73,9 @@ class IndexCalculator:
 
     def __init__(self, schedule=None, frequency=None, start=True, end=False, **kwargs):
         """
-        :param schedule:
-        :param frequency:
-        :param start:
-        :param end:
-        :param market_open:
-        :param brk:
-        :param rth:
-        :param post:
+
+
+
         """
         self._freq = None if frequency is None else pd.Timedelta(frequency)
 
@@ -373,21 +93,7 @@ class IndexCalculator:
         self._adj = (self.start is not False or self.end != "cross" or any((x == "end" for x in _vals)))
         self._align = any(_vals)
 
-        if schedule is None:
-            self.schedtz = self.SCHEDTZ
-            self.schedule = pd.DataFrame(columns=["real", "start", "end", "session"])
-            self.__frm = self.__to =  self._some_date
-        else:
-            self._verify_schedule(schedule)
-            if schedule.columns[0] in kwargs or "break_end" in kwargs:
-                raise InvalidConfiguration("Sessions start cannot be borders")
-
-            self.schedtz = schedule.iloc[:, 0].dt.tz
-            self.schedule = self._create_sessions_and_parts(schedule)
-            self.__frm = self.schedule.real.iat[0]
-            self.__to = self.schedule.end.iat[-1]
-
-        self.clear()
+        self.schedule = schedule # see @schedule.setter
 
     use = __init__
 
@@ -401,10 +107,34 @@ class IndexCalculator:
         self.use(schedule=schedule, frequency=frequency, start=start, end=end, **kwargs)
         yield
         self.use(schedule=None, **original_settings)  # passing None and setting it directly,
-        self.schedule = original_schedule  # bypasses the calculation
+        self._schedule = original_schedule  # bypasses the calculation
         self.schedtz = original_tz
         self.__frm = frm
         self.__to = to
+
+    @property
+    def settings(self):
+        return dict(frequency=self._freq, start=self.start, end=self.end, **self._aligns)
+
+    @property
+    def schedule(self): return self._schedule
+
+    @schedule.setter
+    def schedule(self, schedule):
+        self.clear()
+        if schedule is None:
+            self.schedtz = self.SCHEDTZ
+            self._schedule = pd.DataFrame(columns=["real", "start", "end", "session"])
+            self.__frm = self.__to =  self._some_date
+        else:
+            self._verify_schedule(schedule)
+            if schedule.columns[0] in self._aligns or "break_end" in self._aligns:
+                raise InvalidConfiguration("Sessions start cannot be borders")
+
+            self.schedtz = schedule.iloc[:, 0].dt.tz
+            self._schedule = self._create_sessions_and_parts(schedule)
+            self.__frm = self.schedule.real.iat[0]
+            self.__to = self.schedule.end.iat[-1]
 
     @property
     def frequency(self):
@@ -447,11 +177,7 @@ class IndexCalculator:
 
         start is the beginning of the part/session
         end is the end
-        _session  is -1, 0, 1, or 2
-            -1 indicating not a session
-            O indicating start and end of a session
-            1 indicating start is start of a session
-            2 indicating end is end of a session
+
 
         all parts/sessions where start == end will be dropped entirely
 
@@ -493,7 +219,6 @@ class IndexCalculator:
         original_freq = self._freq
         original_start = self.schedule.start
         original_times = self.__times
-        self.clear()
         self.frequency = frequency  # will adjust starts
         yield
         self.schedule["start"] = original_start  # reset to prior
@@ -647,7 +372,6 @@ class IndexCalculator:
                 (may lead to wrong ones)
                 keep only those that have dates in either real or end
                 yield that
-                then drop whatever was yielded from `data`
         """
 
         grps = self._sched.groupby(

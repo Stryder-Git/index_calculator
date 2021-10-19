@@ -141,10 +141,6 @@ class IndexCalculator:
     def frequency(self, frequency):
         self.clear()
         self._freq = pd.Timedelta(frequency)
-        if not "_change" in self.schedule:
-            # _change is left in there if the start column has never been calculated
-            # (i.e.: partially initialized without frequency)
-            self.schedule["_change"] = self.schedule.start.ne(self.schedule.real)  # mark what needs to adj
         self.schedule["start"] = self.schedule.real  # replace calced_starts with real one
         self._adjust_start_inplace(self.schedule)
 
@@ -157,8 +153,6 @@ class IndexCalculator:
             adj = (schedule.end - schedule.start) % self.frequency  # calc the part left to fill
             adj.loc[adj.ne(self._tdzero)] = self.frequency - adj
             schedule.loc[schedule._change, "start"] = schedule.start - adj  # extend it
-
-        del schedule["_change"]
 
     def _create_sessions_and_parts(self, schedule):
         """
@@ -216,7 +210,6 @@ class IndexCalculator:
         original_freq = self._freq
         original_start = self.schedule.start
         original_times = self.__times
-        self.clear()
         self.frequency = frequency  # will adjust starts
         yield
         self.schedule["start"] = original_start  # reset to prior

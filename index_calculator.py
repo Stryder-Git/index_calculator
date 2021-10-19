@@ -33,6 +33,8 @@ class IndexCalculator:
     _day = pd.Timedelta("1D")
     _some_date = pd.Timestamp(0)  # epoch
     _srt = "__srtclm__"
+    _ssnstart = "__ssnstartclm__"
+    _ssnend = "__ssnendclm__"
     SCHEDTZ = "UTC"
 
     @classmethod
@@ -373,23 +375,44 @@ class IndexCalculator:
                 keep only those that have dates in either real or end
                 yield that
         """
+        real = self._sched.real.set_axis(self._sched.real)
+        real = real - real.dt.normalize()
 
-        grps = self._sched.groupby(
-            [self._sched.real - self._sched.real.dt.normalize(),
-             self._sched.end - self._sched.end.dt.normalize()]).groups
+        end = self._sched.end.set_axis(self._sched.end - self.__inferred_timeframe)
+        end = end - end.dt.normalize()
+
+        try:
+            data.loc[real.index, self._ssnstart] = real
+            data.loc[end.index, self._ssnend] = end
+        except KeyError as e:
+            m = "There are session starts and/or ends in the schedule that are not found in the pricedata"
+            raise InvalidInput(m) from e
+
+        data[[self._ssnstart, self._ssnend]] = data[[self._ssnstart, self._ssnend]].ffill()
+        grps = data.groupby([self._ssnstart, self._ssnend]).groups
 
         for (real, end), index in grps.items():
-            start_dates = self._sched.loc[index, "real"].dt.normalize()  # real start_dates
-            end_dates = self._sched.loc[index, "end"].dt.normalize()  # real end_dates
+            print(real, end)
+            # start_dates = self._sched.loc[index, "real"].dt.normalize()  # real start_dates
+            # end_dates = self._sched.loc[index, "end"].dt.normalize()  # real end_dates
+            #
+            # # get the part based on the real start
+            # part = data.between_time((self._some_date + real).time(),
+            #                          (self._some_date + end).time(),
+            #                          include_start=True, include_end=False)
+            #
+            # ixdf = self.timex().to_frame(name= "timex").between_time((self._some_date + real).time(),
+            #                                                   (self._some_date + end).time(),
+            #                                                   include_start=True, include_end=False)
+            #
+            # ix = part.index.normalize()  # dates in the part
+            # part = part[ix.isin(start_dates) | ix.isin(end_dates)]  # drop any dates that don't match
+            #
+            # _ix = ixdf.index.normalize()
+            # print(part.shape, ixdf[_ix.isin(start_dates) | _ix.isin(end_dates)].shape)
 
-            # get the part based on the real start
-            part = data.between_time((self._some_date + real).time(),
-                                     (self._some_date + end).time(),
-                                     include_start=True, include_end=False)
-
-            ix = part.index.normalize()  # dates in the part
-            part = part[ix.isin(start_dates) | ix.isin(end_dates)]  # drop any dates that don't match
-
+            # print(part)
+            part = data.loc[index]
             if not part.empty:  # use the calced start as origin
                 start = self._sched.at[index[0], "start"]
                 yield part, part.index[0].normalize() + (start - start.normalize())
@@ -457,12 +480,12 @@ class IndexCalculator:
                                     ).dropna(how="any"))
 
             new = pd.concat(parts).sort_values(self._srt)
-            print(new)
+            # print(new)
 
             tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
-            print(tx)
-            new = (new, tx)
-            # new = new.set_index(tx, drop=True).drop(columns=self._srt)
+            # print(tx)
+            # new = (new, tx)
+            new = new.set_index(tx, drop=True).drop(columns=self._srt)
 
         elif even:
             new = data.resample(self.frequency, label=label, origin=self._sched.start.iat[0]
@@ -472,7 +495,7 @@ class IndexCalculator:
             new = group.apply(self._resample(first, agg_map, label)
                               ).droplevel(0).dropna(how="any")
 
-        # new.index.freq = None
+        new.index.freq = None
         return new
 
     def convert(self, data, freq=None, agg_map=None, closed="left", tz=None):
@@ -514,8 +537,8 @@ class IndexCalculator:
             data.columns = data.columns.str.lower()
 
         with self._temp(freq):
-            # new = self._convert(data, agg_map, closed).tz_convert(tz)
-            return self._convert(data, agg_map, closed)
+            new = self._convert(data, agg_map, closed).tz_convert(tz)
+            # return self._convert(data, agg_map, closed)
 
         if is_aware: return new
         return new.tz_localize(None)

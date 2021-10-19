@@ -55,6 +55,10 @@ class IndexCalculator:
     def set_schedule_tz(cls, schedule, to_tz, from_tz= None):
         schedule = schedule.copy()
         for col in schedule:
+            if from_tz is False:
+                schedule[col] = schedule[col].dt.tz_localize(None).dt.tz_localize(to_tz)
+                continue
+
             try:
                 schedule[col] = schedule[col].dt.tz_convert(to_tz)
             except TypeError as e:
@@ -90,7 +94,6 @@ class IndexCalculator:
         self._align = any(_vals)
 
         self.schedule = schedule # see @schedule.setter
-        self.clear()
 
     use = __init__
 
@@ -118,6 +121,7 @@ class IndexCalculator:
 
     @schedule.setter
     def schedule(self, schedule):
+        self.clear()
         if schedule is None:
             self.schedtz = self.SCHEDTZ
             self._schedule = pd.DataFrame(columns=["real", "start", "end", "session"])

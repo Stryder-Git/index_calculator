@@ -33,8 +33,6 @@ class IndexCalculator:
     _day = pd.Timedelta("1D")
     _some_date = pd.Timestamp(0)  # epoch
     _srt = "__srtclm__"
-    _ssnstart = "__ssnstartclm__"
-    _ssnend = "__ssnendclm__"
     SCHEDTZ = "UTC"
 
     @classmethod
@@ -94,7 +92,7 @@ class IndexCalculator:
         self._aligns = kwargs
         self._adj = (self.start is not False or self.end != "cross" or any((x == "end" for x in _vals)))
         self._align = any(_vals)
-        print("setting schedule")
+
         self.schedule = schedule # see @schedule.setter
 
         self.__aggmap = None
@@ -162,10 +160,6 @@ class IndexCalculator:
             adj = (schedule.end - schedule.start) % self.frequency  # calc the part left to fill
             adj.loc[adj.ne(self._tdzero)] = self.frequency - adj
             schedule.loc[schedule._change, "start"] = schedule.start - adj  # extend it
-
-    @property
-    def settings(self):
-        return dict(frequency=self._freq, start=self.start, end=self.end, **self._aligns)
 
     def _create_sessions_and_parts(self, schedule):
         """
@@ -371,7 +365,7 @@ class IndexCalculator:
 
     def _group_parts_origin(self, data):
         """
-        This generator will group the requested parts/sessions in `sched` by
+        This method will group the requested parts/sessions in `sched` by
         their start and end times and use those to yield the required subsections of `data`.
 
         In order to handle varying close/open times, which can lead to duplicate sections
@@ -388,30 +382,19 @@ class IndexCalculator:
         """
         real = self._sched.real.set_axis(self._sched.real)
         real = real - real.dt.normalize()
-
         end = self._sched.end.set_axis(self._sched.end - self.__inferred_timeframe)
         end = end - end.dt.normalize()
 
-        origins = self._sched.start.set_axis(real.index)
-        print(real)
-        print(end)
-        print(real.reindex(data.index))
-        print(end.reindex(data.index))
-        print(pd.concat([real.reindex(data.index).ffill(), end.reindex(data.index).bfill()], axis= 1))
-        return data.groupby([real.reindex(data.index).ffill(),
-                             end.reindex(data.index).bfill()]), origins
+        origins = self._sched.start.set_axis(real.index).reindex(data.index)
 
-    def _group_first(self, data):
-        ix = data.index.to_series()
-        starts = (ix - ix.shift()).le(self.__inferred_timeframe)
-        grp = data.groupby(ix.where(~starts, None).ffill())
-        firstrows = data.index[grp.cumcount().eq(0)]
-        if not firstrows.isin(self._sched.real).all():
-            raise InvalidInput("There seem to be part starts in the pricedata that are not found in the "
-                               "schedule, please make sure the schedule and data match.")
-        return grp, firstrows
+        real = real.reindex(data.index)
+        end = end.reindex(data.index)
+        data.index = data.index.where(origins.isna(), origins)
 
-    def _grouped_resample(self, data, even):
+        return data.groupby([real.set_axis(data.index).ffill(),
+                             end.set_axis(data.index).bfill()])
+
+    def _session_resample(self, part):
         """
         This will handle uneven tfs, by splitting into sesssions
 
@@ -422,21 +405,16 @@ class IndexCalculator:
         :param agg_map:
         :return:
         """
-        grp, firstrows = self._group_first(data)
-        if not firstrows.isin(self._sched.real).all():
+        ix = part.index.to_series()
+        starts = (ix - ix.shift()).le(self.__inferred_timeframe)
+        sessions = part.groupby(ix.where(~starts, None).ffill())
+
+        if not part.index[sessions.cumcount().eq(0)].isin(self._sched.real).all():
             raise InvalidInput("There seem to be part starts in the pricedata that are not found in the "
                                "schedule, please make sure the schedule and data match.")
 
-        origins = self._sched.loc[firstrows, "start"]
-        origins = origins.set_axis(origins["real"])
-        f = self.frequency
-
-        def __new(df):
-            return df.resample(f, origin=origins.at[df.index[0]], label=self.__label
+        return sessions.resample(self._freq, origin="start", label=self.__label
                                ).agg(self.__aggmap)
-
-        return __new
-
 
     def _convert(self, data):
         """
@@ -448,28 +426,24 @@ class IndexCalculator:
             assert not self._srt in data, f"Please rename column: {self._srt}."
             data[self._srt] = np.arange(data.shape[0]) # a column with integers showing the original order of the parts
             self.__aggmap[self._srt] = "first"
-            parts, origin = self._group_parts_origin(data)
+            parts = self._group_parts_origin(data)
+
             if even:
                 new = parts.resample(self.frequency, origin="start", label=self.__label
                                       ).agg(self.__aggmap
                                             ).dropna(how="any")
             else:
-                new = parts.apply(self._grouped_resample)
+                new = parts.apply(self._session_resample)
 
-            new = new.sort_values(self._srt)
             tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
-            new = new.set_index(tx, drop=True).drop(columns=self._srt)
+            new = new.sort_values(self._srt).set_index(tx, drop=True).drop(columns=self._srt)
 
         elif even:
             new = data.resample(self.frequency, label=self.__label, origin=self._sched.start.iat[0]
                                 ).agg(self.__aggmap
                                       ).dropna(how="any")
         else:
-            group, first = self._group_first(data)
-            new = group.resample(self.frequency, label=self.__label, origin= "start"
-                                 ).agg(self.__aggmap
-                                       ).droplevel(0
-                                                   ).dropna(how= "any")
+            new = self._session_resample(data).droplevel(0).dropna(how="any")
 
         new.index.freq = None
         return new

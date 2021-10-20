@@ -524,8 +524,7 @@ def test_last_bug():
     But it must have had something to do with the less clean way of grouping parts,
     which must have caused some kind of index mismatch.
 
-    Resetting index_calculator.py to commit 2048d8d829f09b8570143acf720fc769703f0a97, should make
-    this test fail.
+        the branch old_version_odd_bug is in the state that should make this test fail.
     :return:
     """
     try:

@@ -524,6 +524,33 @@ def test_pricedata_that_should_not_exist():
         _ = ic.convert(left, freq= "12min")
 
 
+##################
+# NEEDS OPTIMIZING
+##################
+def test_last_bug():
+    """
+    I need to drill down on how to write a more specific test for this bug, and
+    make sure that the calculations are correct.
+    But it must have had something to do with the less clean way of grouping parts,
+    which must have caused some kind of index mismatch.
+
+    Resetting index_calculator.py to commit 2048d8d829f09b8570143acf720fc769703f0a97, should make
+    this test fail.
+    :return:
+    """
+    try:
+        df = pd.read_csv("ic_tests\\test_data\\ABBV.csv", parse_dates= ["index"], index_col= "index")
+    except FileNotFoundError:
+        df = pd.read_csv(".\\test_data\\ABBV.csv", parse_dates=["index"], index_col="index")
+
+    nyse = mcal.get_calendar("NYSE")
+    schedule = nyse.schedule("2000-12-23", "2050-12-28", start="pre", end="post")
+
+    ic = IndexCalculator(schedule, **{'frequency': pd.Timedelta('0 days 02:00:00'), 'start': True,
+                               'end': False, 'market_open': 'start', 'post': 'start'})
+
+    ic.convert(df, tz= nyse.tz)
+
 
 if __name__ == '__main__':
 

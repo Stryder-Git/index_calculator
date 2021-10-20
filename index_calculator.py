@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import datetime as dt
 
+__version__ = 0.2
 
 class IndexCalculator:
     """

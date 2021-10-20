@@ -97,6 +97,11 @@ class IndexCalculator:
         print("setting schedule")
         self.schedule = schedule # see @schedule.setter
 
+        self.__agg_map = None
+        self.__closed = None
+        self.__label = None
+        self.__adjclosed = None
+
     use = __init__
 
     @contextmanager
@@ -332,13 +337,12 @@ class IndexCalculator:
 
     __call__.__doc__ = __init__.__doc__
 
-    def _check_data_set_sched(self, data, closed):
-        print("checking data")
+    def _check_data_set_sched(self, data):
         if data.isna().any().any():
             raise InvalidInput("Please handle the missing values in the data before using this method")
 
         self.__inferred_timeframe = (data.index - data.index.to_series().shift()).mode().iat[0]
-        if closed != "left": data.index = data.index - self.__inferred_timeframe
+        if self.__adjclosed: data.index = data.index - self.__inferred_timeframe
 
         if self.__inferred_timeframe >= self.frequency:
             raise InvalidConfiguration("the timeframe to convert from needs to be smaller than the timeframe "
@@ -349,13 +353,20 @@ class IndexCalculator:
         if self.__dmin < self.__frm or dmax > self.__to:
             raise InvalidInput("Schedule doesn't cover the whole data")
 
-        print("preparing self._sched")
         # _sched is needed by the helper functions
         self._sched = self.schedule[self.schedule.real.ge(self.__dmin) & self.schedule.end.le(dmax)]
-        if not self._sched.real.isin(data.index).all():
+
+        if not (self._sched.real.isin(data.index) &
+                self._sched.end.isin(data.index+ self.__inferred_timeframe)).all():
             raise InvalidInput("You seem to have missing data. This is not refering to NaN values but to "
                                "market times that aren't represented in your data. This may also be because your "
                                "timeframe is too large.")
+
+        dates = data.index.normalize().unique()
+        if not (dates.isin(self._sched.real.dt.normalize()) |
+                dates.isin(self._sched.end.dt.normalize())).all():
+            raise InvalidInput("There is data in the index that is not in the schedule")
+
         return data
 
 
@@ -419,7 +430,7 @@ class IndexCalculator:
         return __new
 
 
-    def _convert(self, data, closed):
+    def _convert(self, data):
         """
         :param data:
         :param tz:
@@ -427,8 +438,6 @@ class IndexCalculator:
         :param closed:
         :return:
         """
-        self.__label = "left" if self.start else "right"
-        data = self._check_data_set_sched(data, closed)
         even = (self._day % self.frequency) == self._tdzero  # evenly divides day
 
         if self._align:
@@ -444,11 +453,9 @@ class IndexCalculator:
                 new = parts.apply(self._grouped_resample)
 
             new = new.sort_values(self._srt)
-            # print(new)
 
             tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
-            # print(tx)
-            # new = (new, tx)
+
             new = new.set_index(tx, drop=True).drop(columns=self._srt)
 
         elif even:
@@ -497,13 +504,16 @@ class IndexCalculator:
         if not data.index.is_monotonic_increasing: data = data.sort_index()
 
         if agg_map is None:
-            self.__agg_map = self.default_agg_map.copy()
+            agg_map = self.default_agg_map.copy()
             data.columns = data.columns.str.lower()
-        else: self.__agg_map = agg_map
+
+        self.__agg_map = agg_map
+        self.__adjclosed = closed != "left"
+        self.__label = "left" if self.start else "right"
 
         with self._temp(freq):
-            new = self._convert(data, closed).tz_convert(tz)
-            # return self._convert(data, agg_map, closed)
+²            data = self._check_data_set_sched(data)
+            new = self._convert(data).tz_convert(tz)
 
         if is_aware: return new
         return new.tz_localize(None)

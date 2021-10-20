@@ -409,8 +409,6 @@ def test_convert_exceptions():
                 f"This is was the error string: \n{e.exconly()}"
 
 
-
-
 def test_pricedata_that_should_not_exist():
     """
 
@@ -463,10 +461,18 @@ def test_pricedata_that_should_not_exist():
     with pytest.raises(InvalidInput):
         _ = ic.convert(left, freq= "2.5H")
 
-    # When no alignments, but frequency evenly divides the day,
-    # it will not have this issue but simply take the first available session start in the schedule
-    # as the origin for a full df agg call
-    two = ic.convert(left, freq= "2H")
+
+    # NEW:
+    # New checks in _check_data_set_sched don't allow these quirks anymore
+
+
+    # OLD:
+        # When no alignments, but frequency evenly divides the day,
+        # it will not have this issue but simply take the first available session start in the schedule
+        # as the origin for a full df agg call
+    with pytest.raises(InvalidInput):
+        two = ic.convert(left, freq= "2H")
+
     goal = _pricedata([ ["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 14:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-23 16:00:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -479,7 +485,7 @@ def test_pricedata_that_should_not_exist():
                         ["2020-12-28 16:00:00", 0.0, 1.0, 2.0, 3.0, 8],
                         ["2020-12-28 18:00:00", 0.0, 1.0, 2.0, 3.0, 6]], to= nyse.tz, aware= True)
 
-    assert_frame(two, goal, ic.settings)
+    # assert_frame(two, goal, ic.settings)
 
 
     # when alignments are chosen, it doesn't matter if the frequency evenly divides a day, the
@@ -491,9 +497,10 @@ def test_pricedata_that_should_not_exist():
                        ["2020-12-28 12:00:00", 0.0, 1.0, 2.0, 3.0, 10],
                        ["2020-12-28 14:30:00", 0.0, 1.0, 2.0, 3.0, 10],
                        ["2020-12-28 17:00:00", 0.0, 1.0, 2.0, 3.0, 10]], to=nyse.tz, aware=True)
+    with pytest.raises(InvalidInput):
+        new = ic.convert(left, freq= "2.5H")
 
-    new = ic.convert(left, freq= "2.5H")
-    assert_frame(new, goal, ic.settings)
+    # assert_frame(new, goal, ic.settings)
 
     goal = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 2],
                        ["2020-12-23 12:30:00", 0.0, 1.0, 2.0, 3.0, 8],
@@ -505,9 +512,10 @@ def test_pricedata_that_should_not_exist():
                        ["2020-12-28 14:30:00", 0.0, 1.0, 2.0, 3.0, 4],
                        ["2020-12-28 15:30:00", 0.0, 1.0, 2.0, 3.0, 8],
                        ["2020-12-28 17:30:00", 0.0, 1.0, 2.0, 3.0, 8]], to=nyse.tz, aware=True)
+    with pytest.raises(InvalidInput):
+        new = ic.convert(left, freq= "2H")
 
-    new = ic.convert(left, freq= "2H")
-    assert_frame(new, goal, ic.settings)
+    # assert_frame(new, goal, ic.settings)
 
 
     # unrelated test

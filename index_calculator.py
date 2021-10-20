@@ -97,7 +97,7 @@ class IndexCalculator:
         print("setting schedule")
         self.schedule = schedule # see @schedule.setter
 
-        self.__agg_map = None
+        self.__aggmap = None
         self.__closed = None
         self.__label = None
         self.__adjclosed = None
@@ -425,7 +425,7 @@ class IndexCalculator:
 
         def __new(df):
             return df.resample(f, origin=origins.at[df.index[0]], label=self.__label
-                               ).agg(self.__agg_map)
+                               ).agg(self.__aggmap)
 
         return __new
 
@@ -443,11 +443,11 @@ class IndexCalculator:
         if self._align:
             assert not self._srt in data, f"Please rename column: {self._srt}."
             data[self._srt] = np.arange(data.shape[0]) # a column with integers showing the original order of the parts
-            self.__agg_map[self._srt] = "first"
+            self.__aggmap[self._srt] = "first"
             parts, origin = self._group_parts_origin(data)
             if even:
                 new = parts.resample(self.frequency, origin="start", label=self.__label
-                                      ).agg(self.__agg_map
+                                      ).agg(self.__aggmap
                                             ).dropna(how="any")
             else:
                 new = parts.apply(self._grouped_resample)
@@ -460,10 +460,10 @@ class IndexCalculator:
 
         elif even:
             new = data.resample(self.frequency, label=self.__label, origin=self._sched.start.iat[0]
-                                ).agg(self.__agg_map).dropna(how="any")
+                                ).agg(self.__aggmap).dropna(how="any")
         else:
             group, first = self._group_first(data)
-            new = group.resample(self.frequency).dropna(how="any")
+            new = group.resample(self.frequency).agg(self.__aggmap).dropna(how="any")
 
         new.index.freq = None
         return new
@@ -507,12 +507,12 @@ class IndexCalculator:
             agg_map = self.default_agg_map.copy()
             data.columns = data.columns.str.lower()
 
-        self.__agg_map = agg_map
+        self.__aggmap = agg_map
         self.__adjclosed = closed != "left"
         self.__label = "left" if self.start else "right"
 
         with self._temp(freq):
-²            data = self._check_data_set_sched(data)
+            data = self._check_data_set_sched(data)
             new = self._convert(data).tz_convert(tz)
 
         if is_aware: return new

@@ -405,7 +405,9 @@ class IndexCalculator:
         :param agg_map:
         :return:
         """
-        ix = part.index.to_series()
+        try: ix = part[self._srt]
+        except KeyError: ix = part.index.to_series()
+
         starts = (ix - ix.shift()).le(self.__inferred_timeframe)
         sessions = part.groupby(ix.where(~starts, None).ffill())
 
@@ -424,7 +426,7 @@ class IndexCalculator:
         even = (self._day % self.frequency) == self._tdzero  # evenly divides day
         if self._align:
             assert not self._srt in data, f"Please rename column: {self._srt}."
-            data[self._srt] = np.arange(data.shape[0]) # a column with integers showing the original order of the parts
+            data[self._srt] = data.index # a column with integers showing the original order of the parts
             self.__aggmap[self._srt] = "first"
             parts = self._group_parts_origin(data)
 

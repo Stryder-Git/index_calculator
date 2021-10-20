@@ -98,7 +98,6 @@ class IndexCalculator:
         self.schedule = schedule # see @schedule.setter
 
         self.__aggmap = None
-        self.__closed = None
         self.__label = None
         self.__adjclosed = None
 
@@ -394,6 +393,11 @@ class IndexCalculator:
         end = end - end.dt.normalize()
 
         origins = self._sched.start.set_axis(real.index)
+        print(real)
+        print(end)
+        print(real.reindex(data.index))
+        print(end.reindex(data.index))
+        print(pd.concat([real.reindex(data.index).ffill(), end.reindex(data.index).bfill()], axis= 1))
         return data.groupby([real.reindex(data.index).ffill(),
                              end.reindex(data.index).bfill()]), origins
 
@@ -401,9 +405,13 @@ class IndexCalculator:
         ix = data.index.to_series()
         starts = (ix - ix.shift()).le(self.__inferred_timeframe)
         grp = data.groupby(ix.where(~starts, None).ffill())
-        return grp, data.index[grp.cumcount().eq(0)]
+        firstrows = data.index[grp.cumcount().eq(0)]
+        if not firstrows.isin(self._sched.real).all():
+            raise InvalidInput("There seem to be part starts in the pricedata that are not found in the "
+                               "schedule, please make sure the schedule and data match.")
+        return grp, firstrows
 
-    def _grouped_resample(self, data):
+    def _grouped_resample(self, data, even):
         """
         This will handle uneven tfs, by splitting into sesssions
 
@@ -433,13 +441,9 @@ class IndexCalculator:
     def _convert(self, data):
         """
         :param data:
-        :param tz:
-        :param agg_map:
-        :param closed:
         :return:
         """
         even = (self._day % self.frequency) == self._tdzero  # evenly divides day
-
         if self._align:
             assert not self._srt in data, f"Please rename column: {self._srt}."
             data[self._srt] = np.arange(data.shape[0]) # a column with integers showing the original order of the parts
@@ -453,17 +457,19 @@ class IndexCalculator:
                 new = parts.apply(self._grouped_resample)
 
             new = new.sort_values(self._srt)
-
             tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
-
             new = new.set_index(tx, drop=True).drop(columns=self._srt)
 
         elif even:
             new = data.resample(self.frequency, label=self.__label, origin=self._sched.start.iat[0]
-                                ).agg(self.__aggmap).dropna(how="any")
+                                ).agg(self.__aggmap
+                                      ).dropna(how="any")
         else:
             group, first = self._group_first(data)
-            new = group.resample(self.frequency).agg(self.__aggmap).dropna(how="any")
+            new = group.resample(self.frequency, label=self.__label, origin= "start"
+                                 ).agg(self.__aggmap
+                                       ).droplevel(0
+                                                   ).dropna(how= "any")
 
         new.index.freq = None
         return new
@@ -508,8 +514,8 @@ class IndexCalculator:
             data.columns = data.columns.str.lower()
 
         self.__aggmap = agg_map
-        self.__adjclosed = closed != "left"
         self.__label = "left" if self.start else "right"
+        self.__adjclosed = closed != "left"
 
         with self._temp(freq):
             data = self._check_data_set_sched(data)

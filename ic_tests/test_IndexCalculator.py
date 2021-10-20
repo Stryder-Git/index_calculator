@@ -527,11 +527,14 @@ def test_pricedata_that_should_not_exist():
 
 if __name__ == '__main__':
 
-    test_pricedata_that_should_not_exist()
+    # test_pricedata_that_should_not_exist()
     #
     # # test_times_with_all_arguments()
     # # test_with_odd_columns()
     # #
+
+    test_convert()
+    exit()
 
     for ref, obj in locals().copy().items():
         if ref.startswith("test_"):

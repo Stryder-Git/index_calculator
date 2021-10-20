@@ -157,8 +157,6 @@ class IndexCalculator:
             adj.loc[adj.ne(self._tdzero)] = self.frequency - adj
             schedule.loc[schedule._change, "start"] = schedule.start - adj  # extend it
 
-        del schedule["_change"]
-
     @property
     def settings(self):
         return dict(frequency=self._freq, start=self.start, end=self.end, **self._aligns)
@@ -457,12 +455,9 @@ class IndexCalculator:
                                     ).dropna(how="any"))
 
             new = pd.concat(parts).sort_values(self._srt)
-            print(new)
 
             tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
-            print(tx)
-            new = (new, tx)
-            # new = new.set_index(tx, drop=True).drop(columns=self._srt)
+            new = new.set_index(tx, drop=True).drop(columns=self._srt)
 
         elif even:
             new = data.resample(self.frequency, label=label, origin=self._sched.start.iat[0]
@@ -514,8 +509,8 @@ class IndexCalculator:
             data.columns = data.columns.str.lower()
 
         with self._temp(freq):
-            # new = self._convert(data, agg_map, closed).tz_convert(tz)
-            return self._convert(data, agg_map, closed)
+            new = self._convert(data, agg_map, closed).tz_convert(tz)
+            # return self._convert(data, agg_map, closed)
 
         if is_aware: return new
         return new.tz_localize(None)

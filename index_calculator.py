@@ -464,11 +464,11 @@ class IndexCalculator:
             same as the input data
         """
 
-        if data.isna().any().any():
-            raise InvalidInput("Please handle the missing values in the data before using this method")
-
         if sum((self.start is False, self.end is False)) != 1:
             raise InvalidConfiguration("Exactly one of start and end should be False, when converting timeframes")
+
+        if data.isna().any().any():
+            raise InvalidInput("Please handle the missing values in the data before using this method")
 
         try:
             _tz = data.index.tz

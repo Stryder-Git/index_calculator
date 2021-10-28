@@ -34,8 +34,9 @@ def keep_timezone(meth):
         if is_aware: return result
         return result.tz_localize(None)
 
-
     return _meth
+
+
 
 
 class IndexCalculator:
@@ -526,8 +527,8 @@ class IndexCalculator:
             yield vals.set_axis(vals), "session_starts", args[0]
 
         if args[1]:
-            vals = self._sched.groupby("session", sort=False).max()
-            vals.index = vals.index - self.__inferred_timeframe
+            vals = self._sched.groupby("session", sort=False)["end"].max()
+            vals.index = vals - self.__inferred_timeframe
             yield vals, "session_ends", args[1]
 
         if args[2]:
@@ -536,7 +537,7 @@ class IndexCalculator:
 
         if args[3]:
             vals = self._sched["end"]
-            vals.index = vals.index - self.__inferred_timeframe
+            vals.index = vals - self.__inferred_timeframe
             yield vals, "part_ends", args[3]
 
     @keep_timezone

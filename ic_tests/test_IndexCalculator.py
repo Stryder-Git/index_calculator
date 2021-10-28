@@ -587,7 +587,58 @@ def test_basic_match():
 
     goal["session_starts"] = goal.session_starts.astype("datetime64[ns, UTC]")
 
+
     assert_frame(ic.match(left.index, session_starts= True), goal)
+    goal = goal.rename(columns= {"session_starts": "part_starts"})
+    assert_frame(ic.match(left.index, part_starts=True), goal)
+
+    old = goal.copy()
+
+    goal = _pricedata(
+               [["2020-12-23 12:00:00", None], ["2020-12-23 12:30:00", None],
+                ["2020-12-23 13:00:00", None], ["2020-12-23 13:30:00", None],
+                ["2020-12-23 14:00:00", None], ["2020-12-23 14:30:00", None],
+                ["2020-12-23 15:00:00", None], ["2020-12-23 15:30:00", None],
+                ["2020-12-23 16:00:00", None], ["2020-12-23 16:30:00", None],
+                ["2020-12-23 17:00:00", None], ["2020-12-23 17:30:00", None],
+                ["2020-12-23 18:00:00", None], ["2020-12-23 18:30:00", None],
+                ["2020-12-23 19:00:00", "2020-12-23 19:30:00"],
+
+                ["2020-12-24 12:00:00", None], ["2020-12-24 12:30:00", None],
+                ["2020-12-24 13:00:00", None], ["2020-12-24 13:30:00", None],
+                ["2020-12-24 14:00:00", None], ["2020-12-24 14:30:00", None],
+                ["2020-12-24 15:00:00", None], ["2020-12-24 15:30:00", None],
+                ["2020-12-24 16:00:00", None], ["2020-12-24 16:30:00", None],
+                ["2020-12-24 17:00:00", None], ["2020-12-24 17:30:00", "2020-12-24 18:00:00"],
+
+                ["2020-12-28 12:00:00", None], ["2020-12-28 12:30:00", None],
+                ["2020-12-28 13:00:00", None], ["2020-12-28 13:30:00", None],
+                ["2020-12-28 14:00:00", None], ["2020-12-28 14:30:00", None],
+                ["2020-12-28 15:00:00", None], ["2020-12-28 15:30:00", None],
+                ["2020-12-28 16:00:00", None], ["2020-12-28 16:30:00", None],
+                ["2020-12-28 17:00:00", None], ["2020-12-28 17:30:00", None],
+                ["2020-12-28 18:00:00", None], ["2020-12-28 18:30:00", None],
+                ["2020-12-28 19:00:00", "2020-12-28 19:30:00"]
+                ], to=nyse.tz, aware=True, cols= ["index", "session_ends"])
+
+
+
+    goal["session_ends"] = goal.session_ends.astype("datetime64[ns, UTC]")
+
+    assert_frame(ic.match(left.index, session_ends= True), goal)
+    goal = goal.rename(columns= {"session_ends": "part_ends"})
+    assert_frame(ic.match(left.index, part_ends=True), goal)
+
+
+    # with two columns and ffill
+    goal = old.assign(session_starts= old.part_starts.ffill(), session_ends= goal.part_ends)
+    goal = goal.drop(columns= ["part_starts"])
+
+    assert_frame(ic.match(left.index, session_ends= True, session_starts= "ffill"), goal)
+
+
+def test_match_w_align():
+    return
 
 
 if __name__ == '__main__':
@@ -601,7 +652,7 @@ if __name__ == '__main__':
     # #
 
     # test_convert()
-    # exit()
+    exit()
 
     for ref, obj in locals().copy().items():
         if ref.startswith("test_"):

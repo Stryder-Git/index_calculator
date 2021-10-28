@@ -6,38 +6,6 @@ from functools import wraps
 
 __version__ = 0.3
 
-def keep_timezone(meth):
-
-    @wraps(meth)
-    def _meth(self, *args, **kwargs):
-        tz = kwargs.get("tz", None)
-        data = args[0]
-
-        if isinstance(data, pd.DataFrame):
-            _tz = data.index.tz
-        else: _tz = data.tz
-
-        try:
-            data = data.tz_convert(self.schedtz)
-        except TypeError as e:
-            if tz is None:
-                raise TimeZoneException("When the index is tz-naive, you must pass"
-                                        " the tz that it should be interpreted in") from e
-            is_aware = False
-            data = data.tz_localize(tz).tz_convert(self.schedtz)
-        else:
-            is_aware = True
-            tz = _tz
-
-        result = meth(self, data, *args[1:], **kwargs).tz_convert(tz)
-
-        if is_aware: return result
-        return result.tz_localize(None)
-
-    return _meth
-
-
-
 
 class IndexCalculator:
     """
@@ -482,7 +450,23 @@ class IndexCalculator:
         new.index.freq = None
         return new
 
-    @keep_timezone
+    def _handle_tz(self, data, tz):
+
+        _tz = data.index.tz
+        try:
+            data = data.tz_convert(self.schedtz)
+        except TypeError as e:
+            if tz is None:
+                raise TimeZoneException("When the index is tz-naive, you must pass"
+                                        " the tz that it should be interpreted in") from e
+            is_aware = False
+            data = data.tz_localize(tz).tz_convert(self.schedtz)
+        else:
+            is_aware = True
+            tz = _tz
+
+        return data, tz, is_aware
+
     def convert(self, data, freq=None, agg_map=None, closed="left", tz=None):
         """
 
@@ -501,6 +485,8 @@ class IndexCalculator:
         if sum((self.start is False, self.end is False)) != 1:
             raise InvalidConfiguration("Exactly one of start and end should be False, when converting timeframes")
 
+        data, tz, is_aware = self._handle_tz(data, tz)
+
         if data.isna().any().any():
             raise InvalidInput("Please handle the missing values in the data before using this method")
 
@@ -516,9 +502,10 @@ class IndexCalculator:
 
         with self._temp(freq):
             data = self._check_index_set_sched(data)
-            new = self._convert(data)
+            new = self._convert(data).tz_convert(tz)
 
-        return new
+        if is_aware: return new
+        return new.tz_localize(None)
 
     def _gen_match(self, args):
 
@@ -540,7 +527,6 @@ class IndexCalculator:
             vals.index = vals - self.__inferred_timeframe
             yield vals, "part_ends", args[3]
 
-    @keep_timezone
     def match(self, ix, closed= "left", session_starts= False, session_ends= False,
               part_starts= False, part_ends= False, tz= None):
         """
@@ -567,16 +553,31 @@ class IndexCalculator:
         if not any(args): args = [True] * len(args)
         self.__adjclosed = closed != "left"
 
-        ix = self._check_index_set_sched(ix.to_frame(name= "index_column"), _check_freq=False)
+        try:
+            ix = ix.to_frame(name= "index_column")
+            is_index = True
+        except AttributeError: is_index = False
+
+        ix, tz, is_aware = self._handle_tz(ix, tz)
+        ix = self._check_index_set_sched(ix, _check_freq=False)
 
         for vals, name, arg in self._gen_match(args):
+            assert not name in ix, f"Please change the name of the column: {name}"
+
             ix.loc[vals.index, name] = vals
             if not arg is True:
                 ix[name] = ix[name].fillna(method= arg)
 
-        del ix["index_column"]
+            ix[name] = ix[name].dt.tz_convert(tz)
+            if not is_aware:
+                ix[name] = ix[name].dt.tz_localize(None)
 
-        return ix
+        if is_index:
+            del ix["index_column"]
+
+        ix = ix.tz_convert(tz)
+        if is_aware: return ix
+        return ix.tz_localize(None)
 
 
 

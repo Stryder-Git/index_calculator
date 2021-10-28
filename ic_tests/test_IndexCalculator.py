@@ -585,7 +585,7 @@ def test_basic_match():
                 ["2020-12-28 19:00:00", None]
                 ], to=nyse.tz, aware=True, cols= ["index", "session_starts"])
 
-    goal["session_starts"] = goal.session_starts.astype("datetime64[ns, UTC]")
+    goal["session_starts"] = goal.session_starts.astype("datetime64[ns, UTC]").dt.tz_convert(nyse.tz)
 
 
     assert_frame(ic.match(left.index, session_starts= True), goal)
@@ -623,9 +623,10 @@ def test_basic_match():
 
 
 
-    goal["session_ends"] = goal.session_ends.astype("datetime64[ns, UTC]")
+    goal["session_ends"] = goal.session_ends.astype("datetime64[ns, UTC]").dt.tz_convert(nyse.tz)
 
-    assert_frame(ic.match(left.index, session_ends= True), goal)
+    # passing a dataframe should add the columns
+    assert_frame(ic.match(left, session_ends= True), pd.concat([left, goal], axis= 1))
     goal = goal.rename(columns= {"session_ends": "part_ends"})
     assert_frame(ic.match(left.index, part_ends=True), goal)
 

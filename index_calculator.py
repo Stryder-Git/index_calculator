@@ -2,9 +2,41 @@ from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
-import datetime as dt
+from functools import wraps
 
 __version__ = 0.3
+
+def keep_timezone(meth):
+
+    @wraps(meth)
+    def _meth(self, *args, **kwargs):
+        tz = kwargs.get("tz", None)
+        data = args[0]
+
+        if isinstance(data, pd.DataFrame):
+            _tz = data.index.tz
+        else: _tz = data.tz
+
+        try:
+            data = data.tz_convert(self.schedtz)
+        except TypeError as e:
+            if tz is None:
+                raise TimeZoneException("When the index is tz-naive, you must pass"
+                                        " the tz that it should be interpreted in") from e
+            is_aware = False
+            data = data.tz_localize(tz).tz_convert(self.schedtz)
+        else:
+            is_aware = True
+            tz = _tz
+
+        result = meth(self, data, *args[1:], **kwargs).tz_convert(tz)
+
+        if is_aware: return result
+        return result.tz_localize(None)
+
+
+    return _meth
+
 
 class IndexCalculator:
     """
@@ -449,6 +481,7 @@ class IndexCalculator:
         new.index.freq = None
         return new
 
+    @keep_timezone
     def convert(self, data, freq=None, agg_map=None, closed="left", tz=None):
         """
 
@@ -470,19 +503,6 @@ class IndexCalculator:
         if data.isna().any().any():
             raise InvalidInput("Please handle the missing values in the data before using this method")
 
-        try:
-            _tz = data.index.tz
-            data = data.tz_convert(self.schedtz)
-        except TypeError as e:
-            if tz is None:
-                raise TimeZoneException("When the index is tz-naive, you must pass"
-                                        " the tz that it should be interpreted in") from e
-            is_aware = False
-            data = data.tz_localize(tz).tz_convert(self.schedtz)
-        else:
-            is_aware = True
-            tz = _tz
-
         if not data.index.is_monotonic_increasing: data = data.sort_index()
 
         if agg_map is None:
@@ -495,10 +515,9 @@ class IndexCalculator:
 
         with self._temp(freq):
             data = self._check_index_set_sched(data)
-            new = self._convert(data).tz_convert(tz)
+            new = self._convert(data)
 
-        if is_aware: return new
-        return new.tz_localize(None)
+        return new
 
     def _gen_match(self, args):
 
@@ -520,9 +539,9 @@ class IndexCalculator:
             vals.index = vals.index - self.__inferred_timeframe
             yield vals, "part_ends", args[3]
 
-
+    @keep_timezone
     def match(self, ix, closed= "left", sessions_starts= False, session_ends= False,
-              part_starts= False, part_ends= False):
+              part_starts= False, part_ends= False, tz= None):
         """
 
         :param ix: pd.DatetimeIndex to match

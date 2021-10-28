@@ -392,22 +392,6 @@ def test_convert():
     new = ic.convert(data, closed= "right")
     assert_frame(new, goal, ic.settings)
 
-
-def test_convert_exceptions():
-    # Either start or end must be set to False when using .convert()
-    with pytest.raises(InvalidConfiguration) as e1: IndexCalculator(start= True, end= True).convert("")
-    with pytest.raises(InvalidConfiguration) as e2: IndexCalculator(start= True, end= "cross").convert("")
-    with pytest.raises(InvalidConfiguration) as e3: IndexCalculator(start= "cross", end= True).convert("")
-    with pytest.raises(InvalidConfiguration) as e4: IndexCalculator(start= "cross", end= "cross").convert("")
-
-    # But at least one must be something other than False
-    with pytest.raises(InvalidConfiguration) as e5: IndexCalculator(start= False, end= False).convert("")
-
-    for e in (e1,e2,e3,e4,e5):
-        assert e.exconly() == "index_calculator.InvalidConfiguration:" \
-                              " Exactly one of start and end should be False, when converting timeframes", \
-                f"This is was the error string: \n{e.exconly()}"
-
 ####################
 # GENERAL USE DATA #
 ####################
@@ -444,6 +428,20 @@ left = _pricedata([["2020-12-23 12:00:00", 0.0, 1.0, 2.0, 3.0, 2], ["2020-12-23 
                    ], to=nyse.tz, aware=True)
 
 
+def test_convert_exceptions():
+    # Either start or end must be set to False when using .convert()
+    with pytest.raises(InvalidConfiguration) as e1: IndexCalculator(start= True, end= True).convert(left)
+    with pytest.raises(InvalidConfiguration) as e2: IndexCalculator(start= True, end= "cross").convert(left)
+    with pytest.raises(InvalidConfiguration) as e3: IndexCalculator(start= "cross", end= True).convert(left)
+    with pytest.raises(InvalidConfiguration) as e4: IndexCalculator(start= "cross", end= "cross").convert(left)
+
+    # But at least one must be something other than False
+    with pytest.raises(InvalidConfiguration) as e5: IndexCalculator(start= False, end= False).convert(left)
+
+    for e in (e1,e2,e3,e4,e5):
+        assert e.exconly() == "index_calculator.InvalidConfiguration:" \
+                              " Exactly one of start and end should be False, when converting timeframes", \
+                f"This is was the error string: \n{e.exconly()}"
 
 
 def test_pricedata_that_should_not_exist():
@@ -529,7 +527,6 @@ def test_pricedata_that_should_not_exist():
     with pytest.raises(InvalidConfiguration):
         _ = ic.convert(left, freq= "12min")
 
-
 ##################
 # NEEDS OPTIMIZING
 ##################
@@ -556,8 +553,33 @@ def test_last_bug():
 
     ic.convert(df, tz= nyse.tz)
 
-def test_match():
-    return
+# def test_basic_match():
+#     """Neither alignments nor imperfect data"""
+#
+#     ic = IndexCalculator(schedule)
+#
+#     goal = p
+#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':

@@ -5,10 +5,11 @@ from pandas.testing import assert_index_equal, assert_frame_equal, assert_series
 pricecols = "date open high low close volume".split()
 nysetz = mcal.get_calendar("NYSE").tz
 
-def _pricedata(data, frm= "UTC", to= "UTC", aware= True):
-    df = pd.DataFrame(data, columns= pricecols)
-    df["date"] = pd.to_datetime(df["date"])
-    df = df.set_index("date", drop= True).tz_localize(frm).tz_convert(to)
+def _pricedata(data, frm= "UTC", to= "UTC", aware= True, cols= None):
+    cols = pricecols if cols is None else cols
+    df = pd.DataFrame(data, columns= cols)
+    df[cols[0]] = pd.to_datetime(df[cols[0]])
+    df = df.set_index(cols[0], drop= True).tz_localize(frm).tz_convert(to)
     if not aware: df = df.tz_localize(None)
     df.index.name = None
     return df

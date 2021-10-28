@@ -553,36 +553,46 @@ def test_last_bug():
 
     ic.convert(df, tz= nyse.tz)
 
-# def test_basic_match():
-#     """Neither alignments nor imperfect data"""
-#
-#     ic = IndexCalculator(schedule)
-#
-#     goal = p
-#
+def test_basic_match():
+    """Neither alignments nor imperfect data"""
 
+    ic = IndexCalculator(schedule)
 
+    goal = _pricedata(
+               [["2020-12-23 12:00:00", "2020-12-23 12:00:00"], ["2020-12-23 12:30:00", None],
+                ["2020-12-23 13:00:00", None], ["2020-12-23 13:30:00", None],
+                ["2020-12-23 14:00:00", None], ["2020-12-23 14:30:00", None],
+                ["2020-12-23 15:00:00", None], ["2020-12-23 15:30:00", None],
+                ["2020-12-23 16:00:00", None], ["2020-12-23 16:30:00", None],
+                ["2020-12-23 17:00:00", None], ["2020-12-23 17:30:00", None],
+                ["2020-12-23 18:00:00", None], ["2020-12-23 18:30:00", None],
+                ["2020-12-23 19:00:00", None],
 
+                ["2020-12-24 12:00:00", "2020-12-24 12:00:00"], ["2020-12-24 12:30:00", None],
+                ["2020-12-24 13:00:00", None], ["2020-12-24 13:30:00", None],
+                ["2020-12-24 14:00:00", None], ["2020-12-24 14:30:00", None],
+                ["2020-12-24 15:00:00", None], ["2020-12-24 15:30:00", None],
+                ["2020-12-24 16:00:00", None], ["2020-12-24 16:30:00", None],
+                ["2020-12-24 17:00:00", None], ["2020-12-24 17:30:00", None],
 
+                ["2020-12-28 12:00:00", "2020-12-28 12:00:00"], ["2020-12-28 12:30:00", None],
+                ["2020-12-28 13:00:00", None], ["2020-12-28 13:30:00", None],
+                ["2020-12-28 14:00:00", None], ["2020-12-28 14:30:00", None],
+                ["2020-12-28 15:00:00", None], ["2020-12-28 15:30:00", None],
+                ["2020-12-28 16:00:00", None], ["2020-12-28 16:30:00", None],
+                ["2020-12-28 17:00:00", None], ["2020-12-28 17:30:00", None],
+                ["2020-12-28 18:00:00", None], ["2020-12-28 18:30:00", None],
+                ["2020-12-28 19:00:00", None]
+                ], to=nyse.tz, aware=True, cols= ["index", "session_starts"])
 
+    goal["session_starts"] = goal.session_starts.astype("datetime64[ns, UTC]")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    assert_frame(ic.match(left.index, session_starts= True), goal)
 
 
 if __name__ == '__main__':
+
+    test_basic_match()
 
     # test_pricedata_that_should_not_exist()
     #

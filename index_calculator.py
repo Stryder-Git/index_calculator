@@ -540,13 +540,13 @@ class IndexCalculator:
             yield vals, "part_ends", args[3]
 
     @keep_timezone
-    def match(self, ix, closed= "left", sessions_starts= False, session_ends= False,
+    def match(self, ix, closed= "left", session_starts= False, session_ends= False,
               part_starts= False, part_ends= False, tz= None):
         """
 
         :param ix: pd.DatetimeIndex to match
         :param closed: what side the intervals are closed
-        :param sessions_starts: [False, True, "ffill", "bfill"] whether to match/and how to fill
+        :param session_starts: [False, True, "ffill", "bfill"] whether to match/and how to fill
         :param session_ends:
         :param part_starts:
         :param part_ends:
@@ -562,16 +562,18 @@ class IndexCalculator:
 
 
         """
-        args = [sessions_starts, session_ends, part_starts, part_ends]
+        args = [session_starts, session_ends, part_starts, part_ends]
         if not any(args): args = [True] * len(args)
         self.__adjclosed = closed != "left"
 
-        ix = self._check_index_set_sched(ix.to_frame(), _check_freq=False)
+        ix = self._check_index_set_sched(ix.to_frame(name= "index_column"), _check_freq=False)
 
         for vals, name, arg in self._gen_match(args):
             ix.loc[vals.index, name] = vals
             if not arg is True:
                 ix[name] = ix[name].fillna(method= arg)
+
+        del ix["index_column"]
 
         return ix
 

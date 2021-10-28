@@ -500,9 +500,29 @@ class IndexCalculator:
         if is_aware: return new
         return new.tz_localize(None)
 
+    def _gen_match(self, args):
+
+        if args[0]:
+            vals = self._sched["session"].drop_duplicates()
+            yield vals.set_axis(vals), "session_starts", args[0]
+
+        if args[1]:
+            vals = self._sched.groupby("session", sort=False).max()
+            vals.index = vals.index - self.__inferred_timeframe
+            yield vals, "session_ends", args[1]
+
+        if args[2]:
+            vals = self._sched["real"].drop_duplicates()
+            yield vals.set_axis(vals), "part_starts", args[2]
+
+        if args[3]:
+            vals = self._sched["end"]
+            vals.index = vals.index - self.__inferred_timeframe
+            yield vals, "part_ends", args[3]
+
 
     def match(self, ix, closed= "left", sessions_starts= False, session_ends= False,
-              part_starts= False, part_ends= False, imperfect= "raise"):
+              part_starts= False, part_ends= False):
         """
 
         :param ix: pd.DatetimeIndex to match
@@ -511,27 +531,31 @@ class IndexCalculator:
         :param session_ends:
         :param part_starts:
         :param part_ends:
-        :param imperfect: how to handle indexs that don't match perfectly
         :return:
         """
         """
         How will this work
-        
+
         - we get an index
-        
+
         for each value to match
         set the value where the index is equal
-        
-        
+
+
         """
-        ix = self._check_index_set_sched(ix.to_frame(), _check_freq= False)
+        args = [sessions_starts, session_ends, part_starts, part_ends]
+        if not any(args): args = [True] * len(args)
+        self.__adjclosed = closed != "left"
 
+        ix = self._check_index_set_sched(ix.to_frame(), _check_freq=False)
 
+        for vals, name, arg in self._gen_match(args):
+            ix.loc[vals.index, name] = vals
+            if not arg is True:
+                ix[name] = ix[name].fillna(method= arg)
 
+        return ix
 
-
-
-        return
 
 
 

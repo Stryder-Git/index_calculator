@@ -331,14 +331,12 @@ class IndexCalculator:
 
     __call__.__doc__ = __init__.__doc__
 
-    def _check_data_set_sched(self, data):
-        if data.isna().any().any():
-            raise InvalidInput("Please handle the missing values in the data before using this method")
+    def _check_index_set_sched(self, data, _check_freq= True):
 
         self.__inferred_timeframe = (data.index - data.index.to_series().shift()).mode().iat[0]
         if self.__adjclosed: data.index = data.index - self.__inferred_timeframe
 
-        if self.__inferred_timeframe >= self.frequency:
+        if _check_freq and self.__inferred_timeframe >= self.frequency:
             raise InvalidConfiguration("the timeframe to convert from needs to be smaller than the timeframe "
                                        "to convert to")
 
@@ -451,7 +449,6 @@ class IndexCalculator:
         new.index.freq = None
         return new
 
-
     def convert(self, data, freq=None, agg_map=None, closed="left", tz=None):
         """
 
@@ -467,6 +464,8 @@ class IndexCalculator:
             same as the input data
         """
 
+        if data.isna().any().any():
+            raise InvalidInput("Please handle the missing values in the data before using this method")
 
         if sum((self.start is False, self.end is False)) != 1:
             raise InvalidConfiguration("Exactly one of start and end should be False, when converting timeframes")
@@ -495,11 +494,49 @@ class IndexCalculator:
         self.__adjclosed = closed != "left"
 
         with self._temp(freq):
-            data = self._check_data_set_sched(data)
+            data = self._check_index_set_sched(data)
             new = self._convert(data).tz_convert(tz)
 
         if is_aware: return new
         return new.tz_localize(None)
+
+
+    def match(self, ix, closed= "left", sessions_starts= False, session_ends= False,
+              part_starts= False, part_ends= False, imperfect= "raise"):
+        """
+
+        :param ix: pd.DatetimeIndex to match
+        :param closed: what side the intervals are closed
+        :param sessions_starts: [False, True, "ffill", "bfill"] whether to match/and how to fill
+        :param session_ends:
+        :param part_starts:
+        :param part_ends:
+        :param imperfect: how to handle indexs that don't match perfectly
+        :return:
+        """
+        """
+        How will this work
+        
+        - we get an index
+        
+        for each value to match
+        set the value where the index is equal
+        
+        
+        """
+        ix = self._check_index_set_sched(ix.to_frame(), _check_freq= False)
+
+
+
+
+
+
+        return
+
+
+
+
+
 
 
 class IndexCalculatorException(ValueError):

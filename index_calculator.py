@@ -190,13 +190,12 @@ class IndexCalculator:
         for border in schedule.columns:
             option = self._aligns.get(border, False)
             if option or border == "break_start":
-                parts.append(schedule[[earliest, border]].copy())
-                parts[-1]["_change"] = option == "start"
+                parts.append(schedule[[earliest, border]
+                             ].assign(_change= option == "start"))
                 earliest = border.replace("break_start", "break_end")  # in case of breaks
 
         if earliest != latest:
-            parts.append(schedule[[earliest, latest]].copy())
-            parts[-1]["_change"] = False
+            parts.append(schedule[[earliest, latest]].assign(_change= False))
 
         for i in range(len(parts)): parts[i].columns = ["start", "end", "_change"]
         schedule = pd.concat(parts).sort_values(["start", "end"])
@@ -527,7 +526,7 @@ class IndexCalculator:
             vals.index = vals - self.__inferred_timeframe
             yield vals, "part_ends", args[3]
 
-    def match(self, ix, closed= "left", session_starts= False, session_ends= False,
+    def match(self, ix, closed= "left", session_starts= "ffill", session_ends= False,
               part_starts= False, part_ends= False, tz= None):
         """
 
@@ -537,6 +536,7 @@ class IndexCalculator:
         :param session_ends:
         :param part_starts:
         :param part_ends:
+        :param tz: the timezone to interpret the index in (only used when naive)
         :return:
         """
         """
@@ -550,7 +550,6 @@ class IndexCalculator:
 
         """
         args = [session_starts, session_ends, part_starts, part_ends]
-        if not any(args): args = [True] * len(args)
         self.__adjclosed = closed != "left"
 
         try:
@@ -578,10 +577,6 @@ class IndexCalculator:
         ix = ix.tz_convert(tz)
         if is_aware: return ix
         return ix.tz_localize(None)
-
-
-
-
 
 
 

@@ -526,7 +526,7 @@ class IndexCalculator:
             vals.index = vals - self.__inferred_timeframe
             yield vals, "part_ends", part_ends
 
-    def match(self, ix, closed= "left", session_starts= "ffill", session_ends= False,
+    def match(self, ix, closed= "left", session_starts= False, session_ends= False,
               part_starts= False, part_ends= False, tz= None):
         """
 

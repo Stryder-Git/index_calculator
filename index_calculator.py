@@ -506,25 +506,25 @@ class IndexCalculator:
         if is_aware: return new
         return new.tz_localize(None)
 
-    def _gen_match(self, args):
+    def _gen_match(self, session_starts, session_ends, part_starts, part_ends):
 
-        if args[0]:
+        if session_starts:
             vals = self._sched["session"].drop_duplicates()
-            yield vals.set_axis(vals), "session_starts", args[0]
+            yield vals.set_axis(vals), "session_starts", session_starts
 
-        if args[1]:
+        if session_ends:
             vals = self._sched.groupby("session", sort=False)["end"].max()
             vals.index = vals - self.__inferred_timeframe
-            yield vals, "session_ends", args[1]
+            yield vals, "session_ends", session_ends
 
-        if args[2]:
+        if part_starts:
             vals = self._sched["real"].drop_duplicates()
-            yield vals.set_axis(vals), "part_starts", args[2]
+            yield vals.set_axis(vals), "part_starts", part_starts
 
-        if args[3]:
+        if part_ends:
             vals = self._sched["end"]
             vals.index = vals - self.__inferred_timeframe
-            yield vals, "part_ends", args[3]
+            yield vals, "part_ends", part_ends
 
     def match(self, ix, closed= "left", session_starts= "ffill", session_ends= False,
               part_starts= False, part_ends= False, tz= None):
@@ -549,9 +549,7 @@ class IndexCalculator:
 
 
         """
-        args = [session_starts, session_ends, part_starts, part_ends]
         self.__adjclosed = closed != "left"
-
         try:
             ix = ix.to_frame(name= "index_column")
             is_index = True
@@ -560,7 +558,8 @@ class IndexCalculator:
         ix, tz, is_aware = self._handle_tz(ix, tz)
         ix = self._check_index_set_sched(ix, _check_freq=False)
 
-        for vals, name, arg in self._gen_match(args):
+        for vals, name, arg in self._gen_match(session_starts, session_ends,
+                                               part_starts, part_ends):
             assert not name in ix, f"Please change the name of the column: {name}"
 
             ix.loc[vals.index, name] = vals

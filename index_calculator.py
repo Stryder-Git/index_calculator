@@ -201,7 +201,7 @@ class IndexCalculator:
         if earliest != latest:
             parts.append(schedule[[earliest, latest]].assign(_change= False))
 
-        for i in range(len(parts)): parts[i].columns = ["start", "end", "_change"]
+        for part in parts: part.columns = ["start", "end", "_change"]
         schedule = pd.concat(parts).sort_values(["start", "end"])
         schedule = schedule[schedule.start.ne(schedule.end)].reset_index(drop=True)
 

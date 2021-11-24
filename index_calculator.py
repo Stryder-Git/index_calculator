@@ -154,6 +154,10 @@ class IndexCalculator:
         self.schedule["start"] = self.schedule.real  # replace calced_starts with real one
         self._adjust_start_inplace(self.schedule)
 
+    @property
+    def sessions(self):
+        return self.schedule.session.unique()
+
     def _adjust_start_inplace(self, schedule):
         """adjusts start column and deletes _change column in place"""
         if self._freq is None: return
@@ -451,7 +455,9 @@ class IndexCalculator:
 
     def _handle_tz(self, data, tz):
 
-        _tz = data.index.tz
+        try: _tz = data.index.tz
+        except AttributeError: _tz = data.tz
+
         try:
             data = data.tz_convert(self.schedtz)
         except TypeError as e:
@@ -576,6 +582,35 @@ class IndexCalculator:
         ix = ix.tz_convert(tz)
         if is_aware: return ix
         return ix.tz_localize(None)
+
+    # noinspection PyTypeChecker
+    def next_session(self, sessions, n= 1, tz= None):
+        try: sessions[0]
+        except TypeError: sessions = [sessions]
+
+        sessions = pd.DatetimeIndex(sessions)
+        sessions, tz, is_aware = self._handle_tz(sessions, tz= tz)
+        all_sessions = self.schedule.session.unique()
+
+        ixs = all_sessions.searchsorted(sessions) + n
+        if ((ixs >= all_sessions.shape[0]) | (ixs < 0)).any():
+            raise InvalidConfiguration("The schedule doesn't cover some of the dates")
+
+        next_sessions = all_sessions[ixs].tz_convert(tz)
+        if is_aware: return next_sessions
+        return next_sessions.tz_localize(None)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

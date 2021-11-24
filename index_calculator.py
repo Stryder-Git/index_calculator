@@ -593,9 +593,12 @@ class IndexCalculator:
         all_sessions = self.schedule.session.unique()
 
         if sessions.max() >= all_sessions[-1] or sessions.min() <= all_sessions[0]:
-            raise InvalidConfiguration("The schedule doesn't cover some of the dates")
+            raise InvalidInput("The schedule doesn't cover some of the dates")
 
         ixs = all_sessions.searchsorted(sessions) + n
+        if (ixs < 0).any():
+            raise InvalidConfiguration("The offset you chose will place you outside of the date range"
+                                       "covered by the schedule")
         next_sessions = all_sessions[ixs].tz_convert(tz)
         if is_aware: return next_sessions
         return next_sessions.tz_localize(None)

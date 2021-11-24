@@ -585,8 +585,8 @@ class IndexCalculator:
 
     # noinspection PyTypeChecker
     def next_session(self, sessions, n= 1, tz= None):
-        try: sessions[0]
-        except TypeError: sessions = [sessions]
+        _single = isinstance(sessions, (str, pd.Timestamp))
+        if _single: sessions = [sessions]
 
         sessions = pd.DatetimeIndex(sessions)
         sessions, tz, is_aware = self._handle_tz(sessions, tz= tz)
@@ -596,10 +596,12 @@ class IndexCalculator:
             raise InvalidInput("The schedule doesn't cover some of the dates")
 
         ixs = all_sessions.searchsorted(sessions) + n
-        if (ixs < 0).any():
+        if ((ixs < 0) | (ixs >= all_sessions.shape[0])).any():
             raise InvalidConfiguration("The offset you chose will place you outside of the date range"
                                        "covered by the schedule")
+
         next_sessions = all_sessions[ixs].tz_convert(tz)
+        if _single: next_sessions = next_sessions[0]
         if is_aware: return next_sessions
         return next_sessions.tz_localize(None)
 

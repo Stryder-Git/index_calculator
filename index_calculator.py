@@ -592,10 +592,10 @@ class IndexCalculator:
         sessions, tz, is_aware = self._handle_tz(sessions, tz= tz)
         all_sessions = self.schedule.session.unique()
 
-        ixs = all_sessions.searchsorted(sessions) + n
-        if ((ixs >= all_sessions.shape[0]) | (ixs < 0)).any():
+        if sessions.max() >= all_sessions[-1] or sessions.min() <= all_sessions[0]:
             raise InvalidConfiguration("The schedule doesn't cover some of the dates")
 
+        ixs = all_sessions.searchsorted(sessions) + n
         next_sessions = all_sessions[ixs].tz_convert(tz)
         if is_aware: return next_sessions
         return next_sessions.tz_localize(None)

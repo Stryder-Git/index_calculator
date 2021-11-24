@@ -597,7 +597,7 @@ class IndexCalculator:
 
         ixs = all_sessions.searchsorted(sessions) + n
         if ((ixs < 0) | (ixs >= all_sessions.shape[0])).any():
-            raise InvalidConfiguration("The offset you chose will place you outside of the date range"
+            raise InvalidConfiguration("The offset you chose will place you outside of the range "
                                        "covered by the schedule")
 
         next_sessions = all_sessions[ixs].tz_convert(tz)

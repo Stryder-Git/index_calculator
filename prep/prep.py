@@ -14,13 +14,23 @@ class Prep:
     --> Only generates and caches information, no changes are made here
     """
 
+    possible_date_columns = ["index", "unnamed: 0", "date", "time", "datetime", "timestamp", "date time"]
+
+    default_agg_map = {"open": "first", "high": "max", "low": "min",
+                         "close": "last", "volume": "sum"}
+    default_agg = "last"
+
+    @classmethod
+    def set_padding_options(cls, direction= "ffill", per_day= True):
+        cls.PAD_DIRECTION = direction
+        cls.PAD_PER_SESSION = per_day
+
     def __init__(self, df, market_calendar="NYSE", custom_pre= None,
                  custom_post= None, schedule= None):
         """
 
 
         :param df:
-        :param name:
         :param market_calendar:
         :param custom_pre:
         :param custom_post:

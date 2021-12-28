@@ -7,7 +7,7 @@ from functools import cached_property, wraps
 from collections import namedtuple
 import prep.exceptions as ex
 from .filler import Filler
-from index_calculator import IndexCalculator
+from .index_calculator import IndexCalculator
 
 class settings:
 

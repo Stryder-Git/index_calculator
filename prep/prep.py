@@ -1,7 +1,7 @@
 import contextlib
 import warnings
 
-from pandas import pd
+import pandas as pd
 import pandas_market_calendars as mcal
 from functools import cached_property, wraps
 
@@ -12,6 +12,9 @@ from index_calculator import IndexCalculator
 class settings:
 
     WRAPOUTPUT = True
+    DAILY = pd.Timedelta("1D")
+    MAXTIMEFRAME = DAILY
+
 
 def optional_wrap(meth):
     @wraps(meth)
@@ -151,13 +154,12 @@ class Prep:
                  for col in df.columns}
             return m
 
-    # NONE
     @property
     def df(self): return self._df
-    # NONE
     @property
     def mc(self): return self.market_calendar
-    # NONE
+    @property
+    def nrows(self): return self.df.shape[0]
 
     def _verify_index(self, ix, ensure_awareness=True):
         if ensure_awareness and ix.tz is None:

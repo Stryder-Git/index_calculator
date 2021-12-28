@@ -4,7 +4,7 @@ import warnings
 import pandas as pd
 import pandas_market_calendars as mcal
 from functools import cached_property, wraps
-
+from collections import namedtuple
 import prep.exceptions as ex
 from .filler import Filler
 from index_calculator import IndexCalculator
@@ -13,8 +13,8 @@ class settings:
 
     WRAPOUTPUT = True
     DAILY = pd.Timedelta("1D")
-    MAXTIMEFRAME = DAILY
-
+    MAX_TIMEFRAME = DAILY
+    CALMOCK = namedtuple("CALMOCK", ["name"])
 
 def optional_wrap(meth):
     @wraps(meth)
@@ -122,6 +122,25 @@ class Prep(settings):
         self._verify_index(ix, ensure_awareness= True)
         self.df.index = ix
         self.start, self.end = ix[[0, -1]]
+
+    @property
+    def schedule(self): return self._schedule
+
+    @schedule.setter
+    def schedule(self, schedule):
+        self.IC._verify_schedule(schedule)
+
+        self._has_custom_schedule = True
+        self._has_custom_pre_post = "pre" in schedule and "post" in schedule
+
+        self.market_calendar = self.CALMOCK(None)
+        self.ic = self.IC(schedule, self.timeframe)
+        self._schedule = self.IC.set_schedule_tz(schedule, self.tz)
+
+        for att in ("only_rth", "_incomplete", "missing_sessions",
+                    "incomplete_sessions", "incomplete_indexes", "sessions"):
+            try: delattr(self, att)
+            except AttributeError: pass
 
 
     @property

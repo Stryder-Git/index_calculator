@@ -5,8 +5,8 @@ import pandas as pd
 import pandas_market_calendars as mcal
 from functools import cached_property, wraps
 
-import exceptions as ex
-from filler import Filler
+import prep.exceptions as ex
+from .filler import Filler
 from index_calculator import IndexCalculator
 
 class settings:
@@ -28,7 +28,7 @@ def optional_wrap(meth):
     return _meth
 
 
-class Prep:
+class Prep(settings):
     """
     Provides the functionality of inspecting the index, with particular regard for a
     market calendar schedule.
@@ -113,6 +113,16 @@ class Prep:
 
     @property
     def columns(self): return self.df.columns
+
+    @property
+    def index(self): return self.df.index
+
+    @index.setter
+    def index(self, ix):
+        self._verify_index(ix, ensure_awareness= True)
+        self.df.index = ix
+        self.start, self.end = ix[[0, -1]]
+
 
     @property
     def any_nas(self): return self.df.isna().any().any()

@@ -1,7 +1,29 @@
-from pandas import pd
+import contextlib
+import warnings
 
-from functools import cached_property
+from pandas import pd
+import pandas_market_calendars as mcal
+from functools import cached_property, wraps
+
 import exceptions as ex
+from filler import Filler
+from index_calculator import IndexCalculator
+
+class settings:
+
+    WRAPOUTPUT = True
+
+def optional_wrap(meth):
+    @wraps(meth)
+    def _meth(self, *args, **kwargs):
+        wrap = kwargs.get("wrap", None)
+        _return = meth(self, *args, **kwargs)
+        if wrap or (wrap is None and settings.WRAPOUTPUT):
+            return self.__class__(_return)
+        else:
+            return _return
+    return _meth
+
 
 class Prep:
     """
@@ -11,8 +33,9 @@ class Prep:
     This will cache a lot of functionality and only cares about the index so the init
     method should be rerun when a new dataframe doesn't have the exact same index
 
-    --> Only generates and caches information, no changes are made here
     """
+
+    IC = IndexCalculator
 
     possible_date_columns = ["index", "unnamed: 0", "date", "time", "datetime", "timestamp", "date time"]
 
@@ -85,6 +108,15 @@ class Prep:
 
         self._timestamp_min = pd.Timestamp.min.tz_localize(self.tz)
 
+    @property
+    def columns(self): return self.df.columns
+
+    @property
+    def any_nas(self): return self.df.isna().any().any()
+
+    @property
+    def tz(self): return self.index.tz
+
     # NONE
     # since it is only called on single dfs before set-construction
     @classmethod
@@ -126,7 +158,6 @@ class Prep:
     @property
     def mc(self): return self.market_calendar
     # NONE
-
 
     def _verify_index(self, ix, ensure_awareness=True):
         if ensure_awareness and ix.tz is None:
@@ -294,8 +325,6 @@ class Prep:
 
         return self.df[aboveopen & belowclose]
 
-
-
     # changes index WRAP
     @optional_wrap
     def drop_duplicate_indexes(self, wrap= None):
@@ -378,3 +407,11 @@ class Prep:
             f"timezone: {self.tz}\n\nwrapping:\n--------------------------")
         self.df.info(*args, **kwargs)
         print("--------------------------")
+
+    def __repr__(self):
+        m = f"timezone: {self.tz.zone}\n" \
+            f"incomplete sessions: {self.incomplete_sessions.shape[0]}" \
+            f"missing sessions: {self.missing_sessions.shape[0]}\n"
+        return m
+
+    def __str__(self): return self.__repr__()

@@ -3,7 +3,7 @@ import pandas as pd
 from ic_tests.helpers import _pricedata, assert_frame, assert_index, assert_series
 
 import pandas_market_calendars as mcal
-from index_calculator import IndexCalculator
+from prep.index_calculator import IndexCalculator
 
 import datetime as dt
 

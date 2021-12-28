@@ -16,6 +16,9 @@ class settings:
     MAX_TIMEFRAME = DAILY
     CALMOCK = namedtuple("CALMOCK", ["name"])
 
+    PAD_DIRECTION = "ffill"
+    PAD_PER_SESSION = True
+
 def optional_wrap(meth):
     @wraps(meth)
     def _meth(self, *args, **kwargs):

@@ -96,10 +96,6 @@ class IndexCalculator:
 
         self.schedule = schedule # see @schedule.setter
 
-        self.__aggmap = None
-        self.__label = None
-        self.__adjclosed = None
-
     use = __init__
 
     @contextmanager
@@ -331,27 +327,27 @@ class IndexCalculator:
 
     __call__.__doc__ = __init__.__doc__
 
-    def _check_data_set_sched(self, data):
+    def _check_data_set_sched(self, data, adjclosed):
         if data.isna().any().any():
             raise InvalidInput("Please handle the missing values in the data before using this method")
 
-        self.__inferred_timeframe = (data.index - data.index.to_series().shift()).mode().iat[0]
-        if self.__adjclosed: data.index = data.index - self.__inferred_timeframe
+        inferred_tf = (data.index - data.index.to_series().shift()).mode().iat[0]
+        if adjclosed: data.index = data.index - inferred_tf
 
-        if self.__inferred_timeframe >= self.frequency:
+        if inferred_tf >= self.frequency:
             raise InvalidConfiguration("the timeframe to convert from needs to be smaller than the timeframe "
                                        "to convert to")
 
-        self.__dmin, self.__dmax = data.index[[0, -1]]
-        dmax = self.__dmax + self.__inferred_timeframe
-        if self.__dmin < self.__frm or dmax > self.__to:
+        dmin, dmax = data.index[[0, -1]]
+        dmax = dmax + inferred_tf
+        if dmin < self.__frm or dmax > self.__to:
             raise InvalidInput("Schedule doesn't cover the whole data")
 
         # _sched is needed by the helper functions
-        self._sched = self.schedule[self.schedule.real.ge(self.__dmin) & self.schedule.end.le(dmax)]
+        self._sched = self.schedule[self.schedule.real.ge(dmin) & self.schedule.end.le(dmax)]
 
         if not (self._sched.real.isin(data.index) &
-                self._sched.end.isin(data.index+ self.__inferred_timeframe)).all():
+                self._sched.end.isin(data.index+ inferred_tf)).all():
             raise InvalidInput("You seem to have missing data. This is not refering to NaN values but to "
                                "market times that aren't represented in your data. This may also be because your "
                                "timeframe is too large.")
@@ -361,10 +357,10 @@ class IndexCalculator:
                 dates.isin(self._sched.end.dt.normalize())).all():
             raise InvalidInput("There is data in the index that is not in the schedule")
 
-        return data
+        return data, inferred_tf
 
 
-    def _group_parts_origin(self, data):
+    def _group_parts_origin(self, data, inferred_tf):
         """
         This method will group the requested parts/sessions in `sched` by
         their start and end times and use those to yield the required subsections of `data`.
@@ -383,7 +379,7 @@ class IndexCalculator:
         """
         real = self._sched.real.set_axis(self._sched.real)
         real = real - real.dt.normalize()
-        end = self._sched.end.set_axis(self._sched.end - self.__inferred_timeframe)
+        end = self._sched.end.set_axis(self._sched.end - inferred_tf)
         end = end - end.dt.normalize()
 
         origins = self._sched.start.set_axis(real.index).reindex(data.index)
@@ -395,7 +391,7 @@ class IndexCalculator:
         return data.groupby([real.set_axis(data.index).ffill(),
                              end.set_axis(data.index).bfill()])
 
-    def _session_resample(self, part):
+    def _session_resample(self, part, inferred_tf, label, agg_map):
         """
         This will handle uneven tfs, by splitting into sesssions
 
@@ -409,44 +405,42 @@ class IndexCalculator:
         try: ix = part[self._srt]
         except KeyError: ix = part.index.to_series()
 
-        starts = (ix - ix.shift()).le(self.__inferred_timeframe)
+        starts = (ix - ix.shift()).le(inferred_tf)
         sessions = part.groupby(ix.where(~starts, None).ffill())
 
         if not part.index[sessions.cumcount().eq(0)].isin(self._sched.real).all():
             raise InvalidInput("There seem to be part starts in the pricedata that are not found in the "
                                "schedule, please make sure the schedule and data match.")
 
-        return sessions.resample(self._freq, origin="start", label=self.__label
-                               ).agg(self.__aggmap)
+        return sessions.resample(self._freq, origin="start", label=label).agg(agg_map)
 
-    def _convert(self, data):
+    def _convert(self, data, agg_map, label, closed):
         """
         :param data:
         :return:
         """
         even = (self._day % self.frequency) == self._tdzero  # evenly divides day
+        data, inferred_tf = self._check_data_set_sched(data, closed != "left")
         if self._align:
             assert not self._srt in data, f"Please rename column: {self._srt}."
             data[self._srt] = data.index # a column with integers showing the original order of the parts
-            self.__aggmap[self._srt] = "first"
-            parts = self._group_parts_origin(data)
+            agg_map[self._srt] = "first"
+            parts = self._group_parts_origin(data, inferred_tf)
 
             if even:
-                new = parts.resample(self.frequency, origin="start", label=self.__label
-                                      ).agg(self.__aggmap
-                                            ).dropna(how="any")
+                new = parts.resample(self.frequency, origin="start", label=label
+                                      ).agg(agg_map).dropna(how="any")
             else:
-                new = parts.apply(self._session_resample)
+                new = parts.apply(self._session_resample, args= (inferred_tf, label, agg_map))
 
-            tx = pd.DatetimeIndex(self._times(self.__dmin, self.__dmax))
+            tx = pd.DatetimeIndex(self._times(*data.index[[0, -1]]))
             new = new.sort_values(self._srt).set_index(tx, drop=True).drop(columns=self._srt)
 
         elif even:
-            new = data.resample(self.frequency, label=self.__label, origin=self._sched.start.iat[0]
-                                ).agg(self.__aggmap
-                                      ).dropna(how="any")
+            new = data.resample(self.frequency, label=label, origin=self._sched.start.iat[0]
+                                ).agg(agg_map).dropna(how="any")
         else:
-            new = self._session_resample(data).droplevel(0).dropna(how="any")
+            new = self._session_resample(data, inferred_tf, label, agg_map).droplevel(0).dropna(how="any")
 
         new.index.freq = None
         return new
@@ -490,13 +484,9 @@ class IndexCalculator:
             agg_map = self.default_agg_map.copy()
             data.columns = data.columns.str.lower()
 
-        self.__aggmap = agg_map
-        self.__label = "left" if self.start else "right"
-        self.__adjclosed = closed != "left"
-
+        label = "left" if self.start else "right"
         with self._temp(freq):
-            data = self._check_data_set_sched(data)
-            new = self._convert(data).tz_convert(tz)
+            new = self._convert(data, agg_map, label, closed).tz_convert(tz)
 
         if is_aware: return new
         return new.tz_localize(None)
